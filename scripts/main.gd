@@ -511,10 +511,10 @@ func _cache_bone_map() -> void:
 			neutral_bone_pose[index] = skeleton.get_bone_pose_rotation(index)
 
 
-func _apply_procedural_bone(name: String, angle: float) -> void:
+func _apply_procedural_bone(bone_key: String, angle: float) -> void:
 	if skeleton == null:
 		return
-	var index: int = int(bone_map.get(name, -1))
+	var index: int = int(bone_map.get(bone_key, -1))
 	if index < 0:
 		return
 	var neutral: Quaternion = neutral_bone_pose.get(index, Quaternion.IDENTITY)
