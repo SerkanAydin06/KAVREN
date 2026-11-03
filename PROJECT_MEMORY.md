@@ -69,3 +69,9 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - Gereken sanat varlığı: Mixamo'dan gerçek hareketli Walking.fbx yeniden export edilmeli; statik dosyadan gerçek yürüyüş üretilemez.
 
 - Yeni animasyon ithalatı: `assets/characters/Char1/Walking_Animated.fbx` (Mixamo, FBX Without Skin, In Place) isteğe bağlıdır. Bu dosya mevcut mesh'i koruyarak gerçek yürüyüş klibi ekler. Dosya yoksa koşunun yavaş yedeği kullanılır. Godot CI ile doğrulanacak.
+
+## 2026-11-03 — Uyarı temizliği ve hızlı saldırı
+- `main.gd:404` satırındaki `var position` Node3D'nin aynı isimli özelliğini gölgeliyordu; `hip_key_position` olarak güncellendi.
+- `Walking.fbx` statik poz (gerçek Walk yok) beklenen durum; `push_warning` yerine yalnızca açıklayıcı `print` kaydı bırakıldı. Mevcut 0,65× Run yürüyüş yedeği korundu.
+- `ATTACK_PLAYBACK_SPEED = 3.0` ile saldırı yaklaşık 2,27 saniyeden 0,76 saniyeye indirildi, `attack_remaining` süre hesabı gerçek playback hızına eşitlendi ve geçiş blend'i 0,05 saniyeye kısaltıldı.
+- `tests/character_animation_diagnostics.gd` içerisine saldırı playback hızı ve süresi için otomatik doğrulama eklendi; GitHub Actions ve Windows görsel test sonucu ayrıca incelenmeli.

@@ -24,6 +24,7 @@ const WALK_SPEED := 4.0
 const RUN_SPEED := 7.0
 const MODEL_HEIGHT := 1.8
 const GRAVITY := 18.0
+const ATTACK_PLAYBACK_SPEED := 3.0 # 2.27 sn'lik FBX hareketi ~0.76 sn'de oynat.
 
 var player: CharacterBody3D
 var visuals: Node3D
@@ -356,7 +357,7 @@ func _make_player() -> void:
 				# Mevcut Walking.fbx sadece tek karelik sabit poz tasiyor.
 				walking_animation_fallback = true
 				walk_clip = ""
-				push_warning("Ashvale: Walking.fbx sabit poz (animasyon yok). Gercek yuruyus FBX yuklenene kadar Running klibi yavas kullanilacak.")
+				print("Ashvale: Walking.fbx sadece sabit poz; yuruyus icin gecici olarak yavaslatilmis Run animasyonu kullaniliyor.")
 		if not idle_clip.is_empty():
 			animator.play(idle_clip)
 	if skeleton != null and skeleton.get_bone_count() > 0:
@@ -401,10 +402,10 @@ func _remove_horizontal_root_motion(animation: Animation) -> void:
 			continue
 		var initial_position: Vector3 = animation.track_get_key_value(track_index, 0)
 		for key_index in range(count):
-			var position: Vector3 = animation.track_get_key_value(track_index, key_index)
-			position.x = initial_position.x
-			position.z = initial_position.z
-			animation.track_set_key_value(track_index, key_index, position)
+			var hip_key_position: Vector3 = animation.track_get_key_value(track_index, key_index)
+			hip_key_position.x = initial_position.x
+			hip_key_position.z = initial_position.z
+			animation.track_set_key_value(track_index, key_index, hip_key_position)
 
 
 func _first_non_reset_clip(player_node: AnimationPlayer) -> String:
@@ -479,10 +480,10 @@ func _start_attack() -> void:
 	var animation := animator.get_animation(attack_clip)
 	if animation == null:
 		return
-	attack_remaining = animation.length
+	attack_remaining = animation.length / ATTACK_PLAYBACK_SPEED
 	current_animation_state = "Attack"
-	animator.speed_scale = 1.0
-	animator.play(attack_clip, 0.12)
+	animator.speed_scale = ATTACK_PLAYBACK_SPEED
+	animator.play(attack_clip, 0.05)
 
 
 func _character_candidates() -> Array[String]:
