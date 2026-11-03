@@ -2,6 +2,7 @@ extends Node3D
 
 const FALLBACK_MODEL_PATH := "res://assets/characters/base_adventurer_running.glb"
 const CHAR1_IDLE_PATH := "res://assets/characters/Char1/Idle.fbx"
+const CHAR1_WALK_ANIMATION_PATH := "res://assets/characters/Char1/Walking_Animated.fbx"
 const CHAR1_RUNNING_PATH := "res://assets/characters/Char1/Running.fbx"
 const CHAR1_ATTACK_PATH := "res://assets/characters/Char1/Standing Melee Attack Downward.fbx"
 const PRIORITY_CHARACTER_FILES := [
@@ -331,10 +332,13 @@ func _make_player() -> void:
 		if loaded_character_path.to_lower().ends_with("/walking.fbx") and walk_clip.is_empty():
 			walk_clip = _first_non_reset_clip(animator)
 		var imported_idle := _import_external_clip(CHAR1_IDLE_PATH, "Idle", true)
+		var imported_walk := _import_external_clip(CHAR1_WALK_ANIMATION_PATH, "Walk", true)
 		var imported_run := _import_external_clip(CHAR1_RUNNING_PATH, "Run", true)
 		var imported_attack := _import_external_clip(CHAR1_ATTACK_PATH, "Attack", false)
 		if not imported_idle.is_empty():
 			idle_clip = imported_idle
+		if not imported_walk.is_empty():
+			walk_clip = imported_walk
 		if not imported_run.is_empty():
 			run_clip = imported_run
 		if not imported_attack.is_empty():

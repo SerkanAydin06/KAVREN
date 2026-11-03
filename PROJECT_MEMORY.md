@@ -67,3 +67,5 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - FBX animasyonunun gövdeyi kaydırmasını önlemek için hips yatay root motion sıfırlanıyor. Mevcut Walk dinamikse LOOP_LINEAR yapılıyor.
 - HUD gerçek animasyon durumunu gösteriyor. `tests/character_animation_diagnostics.gd` testine kemik hareketi ve Idle/Walk/Run/Attack durum geçişi kontrolleri eklendi.
 - Gereken sanat varlığı: Mixamo'dan gerçek hareketli Walking.fbx yeniden export edilmeli; statik dosyadan gerçek yürüyüş üretilemez.
+
+- Yeni animasyon ithalatı: `assets/characters/Char1/Walking_Animated.fbx` (Mixamo, FBX Without Skin, In Place) isteğe bağlıdır. Bu dosya mevcut mesh'i koruyarak gerçek yürüyüş klibi ekler. Dosya yoksa koşunun yavaş yedeği kullanılır. Godot CI ile doğrulanacak.

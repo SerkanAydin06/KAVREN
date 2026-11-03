@@ -85,3 +85,9 @@ Oyuncu şimdi:
 - HUD'un `ANİMASYON` satırında şu an seçili hareket görülebilir.
 
 Godot Actions testi artık kemik hareketini, geçişleri, klip oynatma hızını ve kök hareketini kontrol eder.
+
+### Gerçek yürüyüş animasyonunu ayrı eklemek
+
+`Walking.fbx` karakterin **mesh/doku kaynağı** olarak kalmalı; değiştirmene gerek yok.
+
+Mixamo'dan hareket eden yürüyüş animasyonunu **FBX Without Skin**, tercihen **In Place** seçili olarak indir ve dosya adını `Walking_Animated.fbx` yaparak `assets/characters/Char1/` klasörüne ekle. Godot animasyonu ayrı yükler ve iskelete aktarır. Dinamik kemik hareketi varsa gerçek `Walk` otomatik kullanılır, yoksa yavaşlatılmış `Run` yedeği aktif kalır.
