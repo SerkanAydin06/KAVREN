@@ -41,3 +41,9 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - Model yüklenemezse önceki GLB korunup kullanılır. Oyuncu HUD'unda seçilen model ve rig durumu gösterilir.
 - Doğrulama: kod kaynağı denetimi ve GitHub Actions headless import/smoke testi; gerçek `char1` modeli depoda olmadığından onun rig/animasyonları ayrıca doğrulanmalıdır.
 - Commitler: https://github.com/SerkanAydin06/ashvale-survival-rpg/commits/main
+
+## 2026-11-03 — Char1 model ve FBX animasyon birleştirmesi
+- `8805f82...` güncellemesinde `assets/characters/Char1/Walking.fbx`, `Idle.fbx`, `Running.fbx`, `Standing Melee Attack Downward.fbx` eklendiği doğrulandı.
+- FBX ikili meta verisi incelendi: `Idle.fbx` ve `Running.fbx` 67 Mixamo kemik modeli ve animasyon eğrileri içeriyor, ancak Geometry içermiyor; bu nedenle karakter mesh'i olarak uygun değiller. `Walking.fbx` 28 MB ve mesh/doku taşıması muhtemel.
+- `scripts/main.gd` Char1 için `Walking.fbx` modelini önceliklendiriyor, ayrı animasyon kaynaklarının iskelet track yollarını yüklenen modelin Skeleton3D yoluna eşliyor; sol tık saldırı klibini oynatıyor.
+- GitHub Actions headless import/smoke test sonucu ve Windows görsel animasyon doğrulaması bu commit sonrasında incelenmeli. Vücut/kol pozları gözle kontrol edilmedikçe kusursuz retarget varsayılmamalı.

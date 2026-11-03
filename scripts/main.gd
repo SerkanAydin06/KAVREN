@@ -1,7 +1,11 @@
 extends Node3D
 
 const FALLBACK_MODEL_PATH := "res://assets/characters/base_adventurer_running.glb"
+const CHAR1_IDLE_PATH := "res://assets/characters/Char1/Idle.fbx"
+const CHAR1_RUNNING_PATH := "res://assets/characters/Char1/Running.fbx"
+const CHAR1_ATTACK_PATH := "res://assets/characters/Char1/Standing Melee Attack Downward.fbx"
 const PRIORITY_CHARACTER_FILES := [
+	"res://assets/characters/Char1/Walking.fbx",
 	"res://assets/characters/char1.glb",
 	"res://assets/characters/char1.gltf",
 	"res://assets/characters/char1.fbx",
@@ -30,6 +34,8 @@ var walk_clip := ""
 var idle_clip := ""
 var jump_clip := ""
 var fall_clip := ""
+var attack_clip := ""
+var attack_remaining := 0.0
 var loaded_character_path := ""
 var character_animation_status := "bekleniyor"
 var motion_time := 0.0
@@ -211,7 +217,7 @@ func _make_hud() -> void:
 	controls.add_theme_color_override("font_shadow_color", Color.BLACK)
 	controls.add_theme_constant_override("shadow_offset_x", 2)
 	controls.add_theme_constant_override("shadow_offset_y", 2)
-	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Topla\nFARE  Kamera / Zoom    ESC  İmleç    F11  Tam Ekran"
+	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Topla\nFARE  Kamera / Zoom    SOL TIK  Saldırı    ESC  İmleç    F11  Tam Ekran"
 	controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(controls)
 	_update_hud()
@@ -317,13 +323,105 @@ func _make_player() -> void:
 		else:
 			animator.stop()
 
+	# Char1 Mixamo FBX dosyalarindaki ortak iskeleti kullanarak klipleri birlestir.
+	# Walking.fbx dokulu modeldir; Idle/Running/Attack sadece animasyon tasir.
+	if loaded_character_path.to_lower().contains("/char1/") and animator != null and skeleton != null:
+		if loaded_character_path.to_lower().ends_with("/walking.fbx") and walk_clip.is_empty():
+			walk_clip = _first_non_reset_clip(animator)
+		var imported_idle := _import_external_clip(CHAR1_IDLE_PATH, "Idle", true)
+		var imported_run := _import_external_clip(CHAR1_RUNNING_PATH, "Run", true)
+		var imported_attack := _import_external_clip(CHAR1_ATTACK_PATH, "Attack", false)
+		if not imported_idle.is_empty():
+			idle_clip = imported_idle
+		if not imported_run.is_empty():
+			run_clip = imported_run
+		if not imported_attack.is_empty():
+			attack_clip = imported_attack
+		if not idle_clip.is_empty():
+			animator.play(idle_clip)
 	if skeleton != null and skeleton.get_bone_count() > 0:
 		_cache_bone_map()
 		character_animation_status = "Klipler" if not run_clip.is_empty() or not walk_clip.is_empty() else "Basit rig hareketi"
 	else:
 		character_animation_status = "Rig yok"
 		push_warning("Ashvale: secilen karakterde Skeleton3D bulunamadi. Kol/bacak animasyonu icin rig gerekli.")
-	print("Ashvale character: ", loaded_character_path, " | skeleton: ", skeleton != null, " | clips: ", idle_clip, "/", walk_clip, "/", run_clip, "/", jump_clip)
+	print("Ashvale character: ", loaded_character_path, " | skeleton: ", skeleton != null, " | clips: ", idle_clip, "/", walk_clip, "/", run_clip, "/", jump_clip, "/", attack_clip)
+
+
+
+func _first_non_reset_clip(player_node: AnimationPlayer) -> String:
+	for name in player_node.get_animation_list():
+		var clip := String(name)
+		if "reset" not in clip.to_lower():
+			return clip
+	return ""
+
+
+func _import_external_clip(fbx_path: String, target_name: String, should_loop: bool) -> String:
+	if animator == null or skeleton == null or not ResourceLoader.exists(fbx_path):
+		return ""
+	var resource := load(fbx_path)
+	if not resource is PackedScene:
+		return ""
+	var source_instance := (resource as PackedScene).instantiate()
+	var source_player := _find_animator(source_instance)
+	if source_player == null:
+		source_instance.queue_free()
+		return ""
+	var clip_name := _first_non_reset_clip(source_player)
+	if clip_name.is_empty():
+		source_instance.queue_free()
+		return ""
+	var original := source_player.get_animation(clip_name)
+	if original == null:
+		source_instance.queue_free()
+		return ""
+	var animation := original.duplicate(true) as Animation
+	var source_root := source_player.get_node_or_null(source_player.root_node)
+	var target_root := animator.get_node_or_null(animator.root_node)
+	if source_root == null or target_root == null:
+		source_instance.queue_free()
+		return ""
+	var target_skeleton_path := String(target_root.get_path_to(skeleton))
+	var updated_tracks := 0
+	for track in range(animation.get_track_count() - 1, -1, -1):
+		var original_path := animation.track_get_path(track)
+		var node_path := NodePath(String(original_path.get_concatenated_names()))
+		var source_node := source_root.get_node_or_null(node_path)
+		var subnames := String(original_path.get_concatenated_subnames())
+		if source_node is Skeleton3D and not subnames.is_empty():
+			animation.track_set_path(track, NodePath(target_skeleton_path + ":" + subnames))
+			updated_tracks += 1
+		else:
+			# Kaynaktaki karakter kok transformunu tasimak istemiyoruz.
+			animation.remove_track(track)
+	source_instance.queue_free()
+	if updated_tracks == 0:
+		push_warning("Ashvale: %s animasyonunda uyumlu iskelet kanali bulunamadi." % fbx_path)
+		return ""
+	animation.loop_mode = Animation.LOOP_LINEAR if should_loop else Animation.LOOP_NONE
+	var library := animator.get_animation_library("Ashvale")
+	if library == null:
+		library = AnimationLibrary.new()
+		if animator.add_animation_library("Ashvale", library) != OK:
+			return ""
+	if library.has_animation(target_name):
+		library.remove_animation(target_name)
+	if library.add_animation(target_name, animation) != OK:
+		return ""
+	print("Ashvale animation imported: ", target_name, " (", updated_tracks, " tracks)")
+	return "Ashvale/" + target_name
+
+
+func _start_attack() -> void:
+	if animator == null or attack_clip.is_empty() or attack_remaining > 0.0:
+		return
+	var animation := animator.get_animation(attack_clip)
+	if animation == null:
+		return
+	attack_remaining = animation.length
+	animator.speed_scale = 1.0
+	animator.play(attack_clip, 0.12)
 
 
 func _character_candidates() -> Array[String]:
@@ -460,6 +558,10 @@ func _update_character_animation(delta: float, moving: bool, sprinting: bool) ->
 		else:
 			target = idle_clip
 
+	if attack_remaining > 0.0:
+		attack_remaining = maxf(attack_remaining - delta, 0.0)
+		if attack_remaining > 0.0:
+			return
 	if animator != null:
 		if not target.is_empty():
 			if animator.current_animation != target or not animator.is_playing():
@@ -534,7 +636,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		camera_distance = clampf(camera_distance + (-0.5 if event.button_index == MOUSE_BUTTON_WHEEL_UP else 0.5), 2.5, 8.5)
 		camera_pivot.get_node("Camera").position.z = camera_distance
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			_start_attack()
+		else:
+			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _physics_process(delta: float) -> void:
 	var input := Vector2(

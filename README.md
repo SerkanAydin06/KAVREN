@@ -61,3 +61,15 @@ Proje bağlamı: [PROJECT_MEMORY.md](PROJECT_MEMORY.md).
 5. Model geriye bakıyorsa `character_facing_offset` değerini 180 olarak değiştirin.
 
 Animasyon sırası: mevcut Idle, Walk, Run, Jump, Fall klipleri adlarına göre algılanır; klip yok ama `Skeleton3D` varsa basit prosedürel yürüyüş/koşu hareketi kullanılır. **T-pose tek başına rig değildir**: `Skeleton3D` bulunmuyorsa karakterin konumu WASD ile değişir ancak uzuvları hareket ettirmek için önce Meshy/Blender'da riglenmesi gerekir. HUD'da seçilen model ve animasyon durumu gösterilir. Gerçekçi yürüyüş için ayrı Idle/Walk/Run animasyonlarını modele eklemek hâlâ önerilir.
+
+## Char1 için gerçek model ve animasyonlar (3 Kasım 2026)
+
+Depoda `assets/characters/Char1/` içinde dört Mixamo FBX dosyası bulunuyor:
+- `Walking.fbx`: **oyuncu için birincil model ve yürüyüş klibi**. 28 MB olması gömülü model/doku içeriğine işaret ediyor; Godot içinde görünüşünü ayrıca kontrol edin.
+- `Idle.fbx`: bekleme animasyonu.
+- `Running.fbx`: koşma animasyonu.
+- `Standing Melee Attack Downward.fbx`: sol tıklamayla saldırı animasyonu (şimdilik hasar sistemi yok).
+
+Başlangıçta `Walking.fbx` yüklenir; diğer FBX dosyalarının iskelet kanalları aynı Skeleton3D'ye eşlenip animasyon kütüphanesine eklenir. Animasyon aktarımı başarısız olursa eski karaktere veya prosedürel hareketlere otomatik düşebilir; Godot çıktısındaki `Ashvale animation imported` kayıtlarını kontrol edin.
+
+**Önemli:** FBX dosyaları Mixamo standardı 67 kemik içeriyor; animasyonların vücuda doğru uygulanması için Godot tarafında gerçek görüntü kontrolü şarttır. Hatalı bir animasyon varsa 3D görünüm, iskelet adları veya klip yolu üzerinden düzeltin.
