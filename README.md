@@ -1,29 +1,53 @@
-# Ashvale — 3D Survival RPG Prototype
+# Ashvale — 3D Survival RPG Prototipi
 
-Godot 4 için Meshy karakterli, üçüncü şahıs kamera ve hareket test sahnesi.
+Godot **4.7.x** (önerilen: 4.7.2) ile oluşturulmuş, üçüncü şahıs keşif ve kaynak toplama prototipi.
 
-## Açılış
-1. Godot 4.3+ açın.
-2. **Import** ile bu klasördeki `project.godot` dosyasını seçin.
-3. GLB importu bitince F6 veya F5 ile oyunu çalıştırın.
+## Kurulum ve çalıştırma
+
+1. Godot 4.7.x ile bu klasördeki `project.godot` dosyasını içeri aktarın.
+2. Meshy karakterinin GLB içe aktarmasının tamamlanmasını bekleyin.
+3. **F5** ile ana sahneyi çalıştırın.
+
+## Ekran
+
+- Tasarım çözünürlüğü: **1920 × 1080 (16:9)**.
+- Başlangıç modu: **Exclusive Fullscreen** (ekranın doğal çözünürlüğüne uyarlanır).
+- **F11** ile tam ekran ve 1280 × 720 pencere modu arasında geçiş yapılır.
+- `canvas_items` + `expand` sayesinde HUD diğer ekran oranlarına da uyum sağlar.
+- Godot ekran kartının fiziksel çözünürlüğünü zorla 1920 × 1080'e çevirmiyor; 1920 × 1080 oyun arayüzünün tasarım boyutudur.
 
 ## Kontroller
-- **WASD** hareket
-- **Mouse** kamera
-- **Shift** koş
-- **Space** zıpla
-- **Esc** fareyi serbest bırak / geri yakala
 
-## Mevcut içerik
-- Meshy'den gelen rigli karakter GLB (`Running` animasyonu)
-- `Running` klibi hareket halinde hızlandırılarak veya yavaşlatılarak oynatılır
-- Sabit boyutlu test alanı, ağaçlar, taşlar, sandıklar
-- Üçüncü şahıs takip kamerası
-- Basit HUD
+| Tuş | İşlev |
+| --- | --- |
+| WASD | Hareket |
+| Fare | Kamera |
+| Fare tekerleği | Kamera uzaklığı |
+| Shift | Koş (dayanıklılık tüketir) |
+| Space | Zıpla |
+| E | Yakındaki odun veya taşı topla |
+| Esc | Fareyi serbest bırak / yakala |
+| F11 | Tam ekran / pencere |
 
-## Sınırlar
-- Bu **oynanış prototipi**. Henüz dövüş, loot, crafting veya save sistemi yok.
-- GLB içinde yalnızca `Running` olduğundan idle pozu sabittir ve yürüyüş için koşma klibi yavaşlatılır.
-- Mevcut Meshy skinning/eklem bozulmaları korunur; bu prototip bunları düzeltmez.
-- GitHub Actions veya otomatik CI yok.
-- GLB dosyası Meshy'den üretilmiş kullanıcı varlığıdır.
+## Şu anda çalışan sistemler
+
+- Meshy GLB karakteri, mevcut animasyonlardan Running ve varsa Idle seçimi
+- Karakter boyuna göre ilk ölçek düzeltmesi; kapsül çarpışma
+- Üçüncü şahıs takip kamerası ve yakınlaştırma
+- Basit ağaç/taş kaynakları, kaynak toplama ve kaynak sayaçları
+- Koşma dayanıklılığı ve yenilenmesi
+- Ağaç gövdesi ile taşların çarpışmaları
+- Tam ekranda okunabilir, ekran köşelerine bağlı HUD
+
+## Henüz bulunmayan sistemler
+
+Envanter, eşya üretimi, savaş, düşman yapay zekâsı, açlık/susuzluk, kayıt/yükleme sistemi. Mevcut Meshy karakterinin skinning/rig sorunları motor koduyla tamamen giderilemez; doğru rig ve ayrı Idle/Walk/Run klipleri önerilir.
+
+## Bakım ve doğrulama
+
+- Ana sahne `main.tscn`, kullanılan ana script `scripts/main.gd`.
+- Godot'un `.godot/` klasörü yerel olarak oluşturulur, Git'e eklenmez.
+- GitHub Actions iş akışı Godot 4.7.2 ile headless import ve kısa sahne açılış kontrolü yapar.
+- Gerçek oyun görüntüsünü, karakter eklemlerini ve tam ekran davranışını Windows üzerinde F5 ile ayrıca kontrol edin.
+
+Proje bağlamı: [PROJECT_MEMORY.md](PROJECT_MEMORY.md).

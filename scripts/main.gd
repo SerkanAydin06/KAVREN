@@ -1,9 +1,9 @@
 extends Node3D
 
 const MODEL_PATH := "res://assets/characters/base_adventurer_running.glb"
-const ALTERNATE_MODEL_PATH := "res://Meshy_AI_Game_ready_stylized_s_Running.glb"
 const WALK_SPEED := 4.0
 const RUN_SPEED := 7.0
+const MODEL_HEIGHT := 1.8
 const GRAVITY := 18.0
 
 var player: CharacterBody3D
@@ -89,6 +89,16 @@ func _make_camp() -> void:
 		trunk.bottom_radius = 0.33
 		trunk.height = 2.4
 		_add_primitive(tree, trunk, Vector3(0, 1.2, 0), Color(0.36, 0.23, 0.13))
+		var tree_body := StaticBody3D.new()
+		tree_body.name = "TrunkBody"
+		tree.add_child(tree_body)
+		var tree_collision := CollisionShape3D.new()
+		var trunk_shape := CylinderShape3D.new()
+		trunk_shape.radius = 0.29
+		trunk_shape.height = 2.4
+		tree_collision.shape = trunk_shape
+		tree_collision.position.y = 1.2
+		tree_body.add_child(tree_collision)
 		var crown := SphereMesh.new()
 		crown.radius = 1.35
 		crown.height = 2.5
@@ -106,6 +116,15 @@ func _make_camp() -> void:
 		rock_mesh.radius = 0.65
 		rock_mesh.height = 0.9
 		_add_primitive(rock, rock_mesh, Vector3(0, 0.35, 0), Color(0.40, 0.43, 0.43))
+		var rock_body := StaticBody3D.new()
+		rock_body.name = "RockBody"
+		rock.add_child(rock_body)
+		var rock_collision := CollisionShape3D.new()
+		var rock_shape := SphereShape3D.new()
+		rock_shape.radius = 0.62
+		rock_collision.shape = rock_shape
+		rock_collision.position.y = 0.35
+		rock_body.add_child(rock_collision)
 		rock.set_meta("resource_type", "stone")
 		resource_nodes.append(rock)
 	var camp := Node3D.new()
@@ -124,23 +143,64 @@ func _make_camp() -> void:
 
 func _make_hud() -> void:
 	var layer := CanvasLayer.new()
+	layer.name = "GameHUD"
 	add_child(layer)
+	var ui_root := Control.new()
+	ui_root.name = "HUDRoot"
+	ui_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(ui_root)
+
+	var panel := PanelContainer.new()
+	panel.name = "ResourcePanel"
+	panel.position = Vector2(32, 32)
+	panel.custom_minimum_size = Vector2(470, 0)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.025, 0.04, 0.05, 0.84)
+	style.corner_radius_top_left = 14
+	style.corner_radius_top_right = 14
+	style.corner_radius_bottom_left = 14
+	style.corner_radius_bottom_right = 14
+	style.content_margin_left = 22
+	style.content_margin_right = 22
+	style.content_margin_top = 16
+	style.content_margin_bottom = 16
+	panel.add_theme_stylebox_override("panel", style)
+	ui_root.add_child(panel)
+
 	hud = Label.new()
-	hud.position = Vector2(20, 20)
-	hud.add_theme_font_size_override("font_size", 19)
+	hud.name = "ResourceInfo"
+	hud.add_theme_font_size_override("font_size", 27)
 	hud.add_theme_color_override("font_color", Color.WHITE)
 	hud.add_theme_color_override("font_shadow_color", Color.BLACK)
 	hud.add_theme_constant_override("shadow_offset_x", 1)
 	hud.add_theme_constant_override("shadow_offset_y", 2)
-	layer.add_child(hud)
+	panel.add_child(hud)
+
+	var controls := Label.new()
+	controls.name = "Controls"
+	controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	controls.offset_left = 32
+	controls.offset_right = 1240
+	controls.offset_top = -90
+	controls.offset_bottom = -32
+	controls.add_theme_font_size_override("font_size", 24)
+	controls.add_theme_color_override("font_color", Color(0.94, 0.96, 0.96))
+	controls.add_theme_color_override("font_shadow_color", Color.BLACK)
+	controls.add_theme_constant_override("shadow_offset_x", 2)
+	controls.add_theme_constant_override("shadow_offset_y", 2)
+	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Topla\nFARE  Kamera / Zoom    ESC  İmleç    F11  Tam Ekran"
+	controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ui_root.add_child(controls)
 	_update_hud()
 
 func _update_hud() -> void:
 	var nearby := _nearest_resource()
 	var hint := ""
 	if nearby != null:
-		hint = " | E: %s topla" % ("Odun" if String(nearby.get_meta("resource_type")) == "wood" else "Tas")
-	hud.text = "ASHVALE - KESIF TESTI\nOdun: %d   Tas: %d   Dayaniklilik: %d\nWASD: hareket  Shift: kos  Space: zipla  ESC: fare\nFare tekerlegi: kamera%s" % [wood, stone, int(stamina), hint]
+		hint = "\n[E] %s topla" % ("ODUN" if String(nearby.get_meta("resource_type")) == "wood" else "TAŞ")
+	hud.text = "ASHVALE  •  KEŞİF\nODUN  %d     TAŞ  %d\nDAYANIKLILIK  %d%%%s" % [wood, stone, int(stamina), hint]
 
 func _nearest_resource() -> Node3D:
 	var best: Node3D = null
@@ -186,12 +246,20 @@ func _make_player() -> void:
 		if resource is PackedScene:
 			var character := (resource as PackedScene).instantiate()
 			visuals.add_child(character)
+			if character is Node3D:
+				var model := character as Node3D
+				var bounds := _measure_model_bounds(model)
+				if bounds.size.y > 0.01:
+					var factor := clampf(MODEL_HEIGHT / bounds.size.y, 0.01, 20.0)
+					model.scale = Vector3.ONE * factor
+					model.position.y = -bounds.position.y * factor
 			animator = _find_animator(character)
 			if animator != null:
 				for animation_name in animator.get_animation_list():
 					if "idle" in String(animation_name).to_lower():
 						idle_clip = String(animation_name)
-					if "running" in String(animation_name).to_lower():
+					var clip_name := String(animation_name).to_lower()
+					if run_clip.is_empty() and ("running" in clip_name or "run" in clip_name):
 						run_clip = String(animation_name)
 				if not idle_clip.is_empty():
 					animator.play(idle_clip)
@@ -219,6 +287,25 @@ func _find_animator(node: Node) -> AnimationPlayer:
 			return found
 	return null
 
+func _measure_model_bounds(model: Node3D) -> AABB:
+	var bounds := AABB()
+	var found := false
+	var pending: Array[Node] = [model]
+	while not pending.is_empty():
+		var node: Node = pending.pop_back()
+		if node is MeshInstance3D:
+			var mesh_node := node as MeshInstance3D
+			var relative := model.global_transform.affine_inverse() * mesh_node.global_transform
+			var part := relative * mesh_node.get_aabb()
+			if not found:
+				bounds = part
+				found = true
+			else:
+				bounds = bounds.merge(part)
+		for child in node.get_children():
+			pending.append(child)
+	return bounds
+
 func _make_camera() -> void:
 	camera_pivot = Node3D.new()
 	camera_pivot.name = "CameraPivot"
@@ -232,6 +319,16 @@ func _make_camera() -> void:
 	camera_pivot.add_child(camera)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F11:
+		var window_mode := DisplayServer.window_get_mode()
+		var is_fullscreen := window_mode == DisplayServer.WINDOW_MODE_FULLSCREEN or window_mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
+		if is_fullscreen:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			DisplayServer.window_set_size(Vector2i(1280, 720))
+		else:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
+		get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		_collect_resource()
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:

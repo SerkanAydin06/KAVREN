@@ -22,3 +22,13 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - Son tamamlanan teknik görev: Henüz bu dosyaya işlenmedi.
 - Son doğrulanan commit: Henüz kaydedilmedi.
 - Bekleyen işler: Yeni kullanıcı görevinde belirlenecek.
+
+## 2026-11-03 — 1920×1080 ve prototip bakım düzenlemesi
+- 1920×1080 tasarım çözünürlüğü, exclusive fullscreen başlangıç, adaptif HUD ve F11 geçişi eklendi.
+- Kullanılmayan kök `main.gd` ve `main.gd.uid` kaldırıldı; gerçek giriş scripti `scripts/main.gd` olarak korundu.
+- Ağaç ve taşlara fiziksel çarpışma, Meshy modeline yükseklik normalizasyonu, koşma klibi adını daha sağlam arama eklendi.
+- Yanlış isimli `download` yerine `.gitignore` eklendi ve `.godot` önbelleği Git takibinden çıkarıldı.
+- README yeniden yazıldı; Godot 4.7.2 için GitHub Actions smoke testi tanımlandı.
+- Test: Kaynak metin bütünlüğü ve depoda referans kontrolleri; yerel Godot çalıştırma testi bu ortamda yapılamadı. CI sonucu GitHub Actions'tan görülmeli.
+- Değişikliklerin geçmişi: https://github.com/SerkanAydin06/ashvale-survival-rpg/commits/main
+- Bekleyen geliştirmeler: Gerçek Idle/Walk/Run animasyonları, rig düzeltmesi, envanter/crafting/savaş, oyun içi menü ve Windows ekran testi.
