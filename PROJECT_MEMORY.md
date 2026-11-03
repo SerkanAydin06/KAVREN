@@ -49,3 +49,9 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - GitHub Actions headless import/smoke test sonucu ve Windows görsel animasyon doğrulaması bu commit sonrasında incelenmeli. Vücut/kol pozları gözle kontrol edilmedikçe kusursuz retarget varsayılmamalı.
 
 - 2026-11-03 (ek doğrulama): GitHub Actions Godot 4.7.2 logunda `Walking.fbx` oyuncu olarak seçildi, `Skeleton3D` bulundu, Idle/Run/Attack sırasıyla 53/43/53 iskelet track'i ile içe aktarıldı. Kütüphane ilk erişiminde oluşan zararsız motor hata satırını engellemek için `has_animation_library` ön kontrolü eklendi; CI artık tüm `ERROR:` satırlarını yakalıyor.
+
+## 2026-11-03 — GDScript isim gölgeleme uyarısı
+- Kullanıcının bildirimi: `scripts/main.gd:353` satırındaki `for name` döngüsü `Node.name` alanını gölgeliyordu (`SHADOWED_VARIABLE_BASE_CLASS`).
+- `name` iteratörü `animation_name` olarak değiştirildi; animasyon seçme davranışı korunuyor.
+- GitHub Actions hata denetimine `SHADOWED_VARIABLE_BASE_CLASS` uyarı kontrolü eklendi.
+- Test: GitHub Actions Godot 4.7.2 headless import/smoke sonucu kontrol edilmeli.

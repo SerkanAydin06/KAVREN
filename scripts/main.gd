@@ -350,8 +350,8 @@ func _make_player() -> void:
 
 
 func _first_non_reset_clip(player_node: AnimationPlayer) -> String:
-	for name in player_node.get_animation_list():
-		var clip := String(name)
+	for animation_name in player_node.get_animation_list():
+		var clip := String(animation_name)
 		if "reset" not in clip.to_lower():
 			return clip
 	return ""
