@@ -42,7 +42,10 @@ func _run() -> void:
 			if target_node == rig:
 				linked_count += 1
 			if bone_track_count < 3:
-				print("AshvaleAnimTest TRACK ", clip_name, " -> ", track_path, " target=", target_node)
+				var key_count := animation.track_get_key_count(track_index)
+				var first_key := animation.track_get_key_value(track_index, 0) if key_count > 0 else null
+				var last_key := animation.track_get_key_value(track_index, key_count - 1) if key_count > 0 else null
+				print("AshvaleAnimTest TRACK ", clip_name, " -> ", track_path, " target=", target_node, " keys=", key_count, " first=", first_key, " last=", last_key)
 		player_node.stop()
 		player_node.play(clip_name)
 		player_node.advance(0.05)
