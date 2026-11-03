@@ -47,3 +47,5 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - FBX ikili meta verisi incelendi: `Idle.fbx` ve `Running.fbx` 67 Mixamo kemik modeli ve animasyon eğrileri içeriyor, ancak Geometry içermiyor; bu nedenle karakter mesh'i olarak uygun değiller. `Walking.fbx` 28 MB ve mesh/doku taşıması muhtemel.
 - `scripts/main.gd` Char1 için `Walking.fbx` modelini önceliklendiriyor, ayrı animasyon kaynaklarının iskelet track yollarını yüklenen modelin Skeleton3D yoluna eşliyor; sol tık saldırı klibini oynatıyor.
 - GitHub Actions headless import/smoke test sonucu ve Windows görsel animasyon doğrulaması bu commit sonrasında incelenmeli. Vücut/kol pozları gözle kontrol edilmedikçe kusursuz retarget varsayılmamalı.
+
+- 2026-11-03 (ek doğrulama): GitHub Actions Godot 4.7.2 logunda `Walking.fbx` oyuncu olarak seçildi, `Skeleton3D` bulundu, Idle/Run/Attack sırasıyla 53/43/53 iskelet track'i ile içe aktarıldı. Kütüphane ilk erişiminde oluşan zararsız motor hata satırını engellemek için `has_animation_library` ön kontrolü eklendi; CI artık tüm `ERROR:` satırlarını yakalıyor.

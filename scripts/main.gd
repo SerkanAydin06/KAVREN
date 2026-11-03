@@ -400,8 +400,10 @@ func _import_external_clip(fbx_path: String, target_name: String, should_loop: b
 		push_warning("Ashvale: %s animasyonunda uyumlu iskelet kanali bulunamadi." % fbx_path)
 		return ""
 	animation.loop_mode = Animation.LOOP_LINEAR if should_loop else Animation.LOOP_NONE
-	var library := animator.get_animation_library("Ashvale")
-	if library == null:
+	var library: AnimationLibrary
+	if animator.has_animation_library("Ashvale"):
+		library = animator.get_animation_library("Ashvale")
+	else:
 		library = AnimationLibrary.new()
 		if animator.add_animation_library("Ashvale", library) != OK:
 			return ""
