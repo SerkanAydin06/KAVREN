@@ -55,3 +55,8 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - `name` iteratörü `animation_name` olarak değiştirildi; animasyon seçme davranışı korunuyor.
 - GitHub Actions hata denetimine `SHADOWED_VARIABLE_BASE_CLASS` uyarı kontrolü eklendi.
 - Test: GitHub Actions Godot 4.7.2 headless import/smoke sonucu kontrol edilmeli.
+
+## 2026-11-03 — GDScript parametre gölgeleme uyarısı
+- `scripts/main.gd:514`: `_apply_procedural_bone(name: String,...)` parametresi `Node.name` ile çakıştığı için `SHADOWED_VARIABLE_BASE_CLASS` uyarısı veriyordu.
+- Parametre `bone_key` olarak güncellendi ve `bone_map.get` kullanımı eşlendi; tüm scriptte kalan `name` adlı parametre/döngü değişkenleri tarandı.
+- Godot Actions doğrulaması commit sonrasında kontrol edilmeli.
