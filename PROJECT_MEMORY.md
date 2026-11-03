@@ -32,3 +32,12 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - Test: Kaynak metin bütünlüğü ve depoda referans kontrolleri; yerel Godot çalıştırma testi bu ortamda yapılamadı. CI sonucu GitHub Actions'tan görülmeli.
 - Değişikliklerin geçmişi: https://github.com/SerkanAydin06/ashvale-survival-rpg/commits/main
 - Bekleyen geliştirmeler: Gerçek Idle/Walk/Run animasyonları, rig düzeltmesi, envanter/crafting/savaş, oyun içi menü ve Windows ekran testi.
+
+## 2026-11-03 — char1 oyuncu yükleyicisi
+- Kullanıcı Meshy'den T-pose temel karakteri `char1` adıyla hazırladığını belirtti.
+- Bu değişiklik sırasında GitHub `main` dalında `char1` dosyası yoktu. Dosya yüklenmiş gibi varsayılmadı.
+- `scripts/main.gd` güncellendi: `char1.glb/.gltf/.fbx/.tscn` önceliklendirmesi, alt klasör araması, Inspector'da manuel `character_file` yolu ve modelin bakış yönü ayarı.
+- Var olan animasyon klipleri (Idle/Walk/Run/Jump/Fall) seçilir; hareket animasyonu yoksa ve `Skeleton3D` mevcutsa basit kol-bacak hareketi denenir; iskeletsiz modelde gerçek animasyon mümkün değildir.
+- Model yüklenemezse önceki GLB korunup kullanılır. Oyuncu HUD'unda seçilen model ve rig durumu gösterilir.
+- Doğrulama: kod kaynağı denetimi ve GitHub Actions headless import/smoke testi; gerçek `char1` modeli depoda olmadığından onun rig/animasyonları ayrıca doğrulanmalıdır.
+- Commitler: https://github.com/SerkanAydin06/ashvale-survival-rpg/commits/main

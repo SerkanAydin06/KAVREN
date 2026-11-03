@@ -51,3 +51,13 @@ Envanter, eşya üretimi, savaş, düşman yapay zekâsı, açlık/susuzluk, kay
 - Gerçek oyun görüntüsünü, karakter eklemlerini ve tam ekran davranışını Windows üzerinde F5 ile ayrıca kontrol edin.
 
 Proje bağlamı: [PROJECT_MEMORY.md](PROJECT_MEMORY.md).
+
+## char1 karakterini çalıştırma
+
+1. Yeni rigli modeli Godot projesinin içine, tercihen `assets/characters/char1.glb` olarak koyun. Dosya `.gltf`, `.fbx` veya `char1.tscn` olabilir.
+2. Godot'un modeli içe aktarmasını bekleyin ve **F5** ile çalıştırın.
+3. Oyun `char1` adlı dosyaları (alt klasördekiler dahil) önce dener; bulamazsa önceki `base_adventurer_running.glb` modelini kullanır.
+4. Özel bir dosya ismi kullanacaksanız `main.tscn` kök düğümünde, Inspector'daki `character_file` alanından model yolunu seçin.
+5. Model geriye bakıyorsa `character_facing_offset` değerini 180 olarak değiştirin.
+
+Animasyon sırası: mevcut Idle, Walk, Run, Jump, Fall klipleri adlarına göre algılanır; klip yok ama `Skeleton3D` varsa basit prosedürel yürüyüş/koşu hareketi kullanılır. **T-pose tek başına rig değildir**: `Skeleton3D` bulunmuyorsa karakterin konumu WASD ile değişir ancak uzuvları hareket ettirmek için önce Meshy/Blender'da riglenmesi gerekir. HUD'da seçilen model ve animasyon durumu gösterilir. Gerçekçi yürüyüş için ayrı Idle/Walk/Run animasyonlarını modele eklemek hâlâ önerilir.

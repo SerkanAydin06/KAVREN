@@ -1,6 +1,20 @@
 extends Node3D
 
-const MODEL_PATH := "res://assets/characters/base_adventurer_running.glb"
+const FALLBACK_MODEL_PATH := "res://assets/characters/base_adventurer_running.glb"
+const PRIORITY_CHARACTER_FILES := [
+	"res://assets/characters/char1.glb",
+	"res://assets/characters/char1.gltf",
+	"res://assets/characters/char1.fbx",
+	"res://assets/characters/char1.tscn",
+	"res://char1.glb",
+	"res://char1.gltf",
+	"res://char1.fbx",
+	"res://char1.tscn",
+]
+# Inspector'da bir model seçilirse, otomatik aramadan önce o kullanılır.
+@export_file("*.glb,*.gltf,*.fbx,*.tscn") var character_file: String = ""
+# Meshy modelleri farkli ileri bakis yonlerinde olabilir.
+@export_range(-180.0, 180.0, 1.0) var character_facing_offset := 0.0
 const WALK_SPEED := 4.0
 const RUN_SPEED := 7.0
 const MODEL_HEIGHT := 1.8
@@ -10,10 +24,17 @@ var player: CharacterBody3D
 var visuals: Node3D
 var camera_pivot: Node3D
 var animator: AnimationPlayer
+var skeleton: Skeleton3D
 var run_clip := ""
+var walk_clip := ""
 var idle_clip := ""
-var idle_pose: Animation
-var idle_ready := false
+var jump_clip := ""
+var fall_clip := ""
+var loaded_character_path := ""
+var character_animation_status := "bekleniyor"
+var motion_time := 0.0
+var bone_map: Dictionary = {}
+var neutral_bone_pose: Dictionary = {}
 var yaw := 0.0
 var pitch := -0.18
 var hud: Label
@@ -200,7 +221,7 @@ func _update_hud() -> void:
 	var hint := ""
 	if nearby != null:
 		hint = "\n[E] %s topla" % ("ODUN" if String(nearby.get_meta("resource_type")) == "wood" else "TAŞ")
-	hud.text = "ASHVALE  •  KEŞİF\nODUN  %d     TAŞ  %d\nDAYANIKLILIK  %d%%%s" % [wood, stone, int(stamina), hint]
+	hud.text = "ASHVALE  •  KEŞİF\nODUN  %d     TAŞ  %d\nDAYANIKLILIK  %d%%%s\nKARAKTER  %s  |  %s" % [wood, stone, int(stamina), hint, loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status]
 
 func _nearest_resource() -> Node3D:
 	var best: Node3D = null
@@ -241,35 +262,22 @@ func _make_player() -> void:
 	visuals = Node3D.new()
 	visuals.name = "Visuals"
 	player.add_child(visuals)
-	if ResourceLoader.exists(MODEL_PATH):
-		var resource := load(MODEL_PATH)
-		if resource is PackedScene:
-			var character := (resource as PackedScene).instantiate()
-			visuals.add_child(character)
-			if character is Node3D:
-				var model := character as Node3D
-				var bounds := _measure_model_bounds(model)
-				if bounds.size.y > 0.01:
-					var factor := clampf(MODEL_HEIGHT / bounds.size.y, 0.01, 20.0)
-					model.scale = Vector3.ONE * factor
-					model.position.y = -bounds.position.y * factor
-			animator = _find_animator(character)
-			if animator != null:
-				for animation_name in animator.get_animation_list():
-					if "idle" in String(animation_name).to_lower():
-						idle_clip = String(animation_name)
-					var clip_name := String(animation_name).to_lower()
-					if run_clip.is_empty() and ("running" in clip_name or "run" in clip_name):
-						run_clip = String(animation_name)
-				if not idle_clip.is_empty():
-					animator.play(idle_clip)
-				elif not run_clip.is_empty():
-					# Use the animation start as a temporary neutral rest pose.
-					animator.play(run_clip)
-					animator.seek(0.0, true)
-					animator.pause()
-	else:
-		print("Meshy karakter dosyasi bulunamadi. Gecici test karakteri kullaniliyor.")
+
+	var character: Node3D = null
+	for path in _character_candidates():
+		if not ResourceLoader.exists(path):
+			continue
+		var file := load(path)
+		if not file is PackedScene:
+			continue
+		var instance := (file as PackedScene).instantiate()
+		if instance is Node3D:
+			character = instance as Node3D
+			loaded_character_path = path
+			break
+		instance.queue_free()
+	if character == null:
+		push_warning("Ashvale: char1 veya yedek GLB bulunamadi; test kapsulu gosteriliyor.")
 		var body := MeshInstance3D.new()
 		var fallback := CapsuleMesh.new()
 		fallback.radius = 0.35
@@ -277,6 +285,83 @@ func _make_player() -> void:
 		body.mesh = fallback
 		body.position.y = 0.9
 		visuals.add_child(body)
+		character_animation_status = "Model yok"
+		return
+
+	character.name = "CharacterModel"
+	visuals.add_child(character)
+	var bounds := _measure_model_bounds(character)
+	if bounds.size.y > 0.01:
+		var factor := clampf(MODEL_HEIGHT / bounds.size.y, 0.01, 20.0)
+		character.scale = Vector3.ONE * factor
+		character.position.y = -bounds.position.y * factor
+
+	animator = _find_animator(character)
+	skeleton = _find_skeleton(character)
+	if animator != null:
+		for clip in animator.get_animation_list():
+			var clip_name := String(clip)
+			var lower := clip_name.to_lower()
+			if idle_clip.is_empty() and ("idle" in lower or "breath" in lower):
+				idle_clip = clip_name
+			elif walk_clip.is_empty() and ("walk" in lower or "walking" in lower):
+				walk_clip = clip_name
+			elif run_clip.is_empty() and ("run" in lower or "sprint" in lower):
+				run_clip = clip_name
+			elif jump_clip.is_empty() and ("jump" in lower or "hop" in lower):
+				jump_clip = clip_name
+			elif fall_clip.is_empty() and ("fall" in lower or "airborne" in lower):
+				fall_clip = clip_name
+		if not idle_clip.is_empty():
+			animator.play(idle_clip)
+		else:
+			animator.stop()
+
+	if skeleton != null and skeleton.get_bone_count() > 0:
+		_cache_bone_map()
+		character_animation_status = "Klipler" if not run_clip.is_empty() or not walk_clip.is_empty() else "Basit rig hareketi"
+	else:
+		character_animation_status = "Rig yok"
+		push_warning("Ashvale: secilen karakterde Skeleton3D bulunamadi. Kol/bacak animasyonu icin rig gerekli.")
+	print("Ashvale character: ", loaded_character_path, " | skeleton: ", skeleton != null, " | clips: ", idle_clip, "/", walk_clip, "/", run_clip, "/", jump_clip)
+
+
+func _character_candidates() -> Array[String]:
+	var paths: Array[String] = []
+	if not character_file.strip_edges().is_empty():
+		paths.append(character_file)
+	for preferred in PRIORITY_CHARACTER_FILES:
+		if not paths.has(preferred):
+			paths.append(preferred)
+	var discovered: Array[String] = []
+	_collect_char1_files("res://", 0, discovered)
+	discovered.sort()
+	for item in discovered:
+		if not paths.has(item):
+			paths.append(item)
+	if not paths.has(FALLBACK_MODEL_PATH):
+		paths.append(FALLBACK_MODEL_PATH)
+	return paths
+
+
+func _collect_char1_files(directory: String, depth: int, results: Array[String]) -> void:
+	if depth > 6:
+		return
+	var folder := DirAccess.open(directory)
+	if folder == null:
+		return
+	for file in folder.get_files():
+		var extension := file.get_extension().to_lower()
+		if not extension in ["glb", "gltf", "fbx", "tscn"]:
+			continue
+		var file_path := directory.path_join(file)
+		if "char1" in file_path.to_lower() and not results.has(file_path):
+			results.append(file_path)
+	for subfolder in folder.get_directories():
+		if subfolder.begins_with(".") or subfolder == "addons":
+			continue
+		_collect_char1_files(directory.path_join(subfolder), depth + 1, results)
+
 
 func _find_animator(node: Node) -> AnimationPlayer:
 	if node is AnimationPlayer:
@@ -286,6 +371,110 @@ func _find_animator(node: Node) -> AnimationPlayer:
 		if found != null:
 			return found
 	return null
+
+
+func _find_skeleton(node: Node) -> Skeleton3D:
+	if node is Skeleton3D:
+		return node as Skeleton3D
+	for child in node.get_children():
+		var found := _find_skeleton(child)
+		if found != null:
+			return found
+	return null
+
+
+func _find_bone_by_suffix(names: Array[String]) -> int:
+	if skeleton == null:
+		return -1
+	for index in range(skeleton.get_bone_count()):
+		var raw := skeleton.get_bone_name(index).to_lower()
+		var normalized := raw.replace(":", "").replace("_", "").replace(".", "").replace("-", "").replace(" ", "")
+		for candidate in names:
+			if normalized.ends_with(candidate):
+				return index
+	return -1
+
+
+func _cache_bone_map() -> void:
+	bone_map.clear()
+	neutral_bone_pose.clear()
+	bone_map["left_leg"] = _find_bone_by_suffix(["leftupleg", "leftupperleg", "leftthigh", "thighl", "upperlegl", "lthigh"])
+	bone_map["right_leg"] = _find_bone_by_suffix(["rightupleg", "rightupperleg", "rightthigh", "thighr", "upperlegr", "rthigh"])
+	bone_map["left_knee"] = _find_bone_by_suffix(["leftleg", "leftlowerleg", "leftshin", "calfl", "lowerlegl", "lcalf"])
+	bone_map["right_knee"] = _find_bone_by_suffix(["rightleg", "rightlowerleg", "rightshin", "calfr", "lowerlegr", "rcalf"])
+	bone_map["left_arm"] = _find_bone_by_suffix(["leftarm", "leftupperarm", "upperarml", "lupperarm"])
+	bone_map["right_arm"] = _find_bone_by_suffix(["rightarm", "rightupperarm", "upperarmr", "rupperarm"])
+	bone_map["spine"] = _find_bone_by_suffix(["spine", "spine1", "spine2", "spine01", "chest"])
+	for value in bone_map.values():
+		var index: int = int(value)
+		if index >= 0:
+			neutral_bone_pose[index] = skeleton.get_bone_pose_rotation(index)
+
+
+func _apply_procedural_bone(name: String, angle: float) -> void:
+	if skeleton == null:
+		return
+	var index: int = int(bone_map.get(name, -1))
+	if index < 0:
+		return
+	var neutral: Quaternion = neutral_bone_pose.get(index, Quaternion.IDENTITY)
+	skeleton.set_bone_pose_rotation(index, neutral * Quaternion(Vector3.RIGHT, angle))
+
+
+func _animate_procedural(delta: float, moving: bool, sprinting: bool, airborne: bool) -> void:
+	if skeleton == null or skeleton.get_bone_count() == 0:
+		return
+	motion_time += delta * (10.5 if sprinting else 7.0) if moving else delta * 1.2
+	var stride := sin(motion_time) * (0.48 if sprinting else 0.29) if moving else 0.0
+	var knee_left := maxf(0.0, -sin(motion_time)) * 0.25 if moving else 0.0
+	var knee_right := maxf(0.0, sin(motion_time)) * 0.25 if moving else 0.0
+	if airborne:
+		stride *= 0.4
+		knee_left = 0.15
+		knee_right = 0.15
+	_apply_procedural_bone("left_leg", stride)
+	_apply_procedural_bone("right_leg", -stride)
+	_apply_procedural_bone("left_knee", knee_left)
+	_apply_procedural_bone("right_knee", knee_right)
+	_apply_procedural_bone("left_arm", -stride * 0.65)
+	_apply_procedural_bone("right_arm", stride * 0.65)
+	_apply_procedural_bone("spine", sin(motion_time * 0.4) * 0.013)
+
+
+func _update_character_animation(delta: float, moving: bool, sprinting: bool) -> void:
+	var airborne := not player.is_on_floor()
+	var target := ""
+	if airborne:
+		if player.velocity.y > 0.0 and not jump_clip.is_empty():
+			target = jump_clip
+		elif player.velocity.y < 0.0 and not fall_clip.is_empty():
+			target = fall_clip
+	if target.is_empty():
+		if moving:
+			if sprinting and not run_clip.is_empty():
+				target = run_clip
+			elif not walk_clip.is_empty():
+				target = walk_clip
+			elif not run_clip.is_empty():
+				target = run_clip
+		else:
+			target = idle_clip
+
+	if animator != null:
+		if not target.is_empty():
+			if animator.current_animation != target or not animator.is_playing():
+				animator.play(target, 0.15)
+			animator.speed_scale = (1.0 if sprinting else 0.65) if target == run_clip else 1.0
+		elif animator.is_playing():
+			animator.stop()
+	if target.is_empty():
+		_animate_procedural(delta, moving, sprinting, airborne)
+	if skeleton == null and moving:
+		motion_time += delta * (10.5 if sprinting else 7.0)
+		visuals.position.y = sin(motion_time) * 0.025
+	else:
+		visuals.position.y = lerpf(visuals.position.y, 0.0, minf(delta * 12.0, 1.0))
+
 
 func _measure_model_bounds(model: Node3D) -> AABB:
 	var bounds := AABB()
@@ -305,6 +494,7 @@ func _measure_model_bounds(model: Node3D) -> AABB:
 		for child in node.get_children():
 			pending.append(child)
 	return bounds
+
 
 func _make_camera() -> void:
 	camera_pivot = Node3D.new()
@@ -365,20 +555,7 @@ func _physics_process(delta: float) -> void:
 		player.velocity.y = -0.1
 	player.move_and_slide()
 	if direction.length_squared() > 0.01:
-		visuals.rotation.y = lerp_angle(visuals.rotation.y, atan2(direction.x, direction.z), delta * 10.0)
-	if animator != null and not run_clip.is_empty():
-		if input.length_squared() > 0.01:
-			if animator.current_animation != run_clip or not animator.is_playing():
-				animator.play(run_clip)
-			animator.speed_scale = 1.1 if sprint else 0.65
-		else:
-			if not idle_clip.is_empty():
-				if animator.current_animation != idle_clip or not animator.is_playing():
-					animator.play(idle_clip, 0.2)
-			else:
-				# Do not freeze in a random running frame.
-				animator.play(run_clip)
-				animator.seek(0.0, true)
-				animator.pause()
+		visuals.rotation.y = lerp_angle(visuals.rotation.y, atan2(direction.x, direction.z) + deg_to_rad(character_facing_offset), delta * 10.0)
+	_update_character_animation(delta, input.length_squared() > 0.01, sprint)
 	camera_pivot.global_position = camera_pivot.global_position.lerp(player.global_position + Vector3(0, 1.5, 0), minf(delta * 8.0, 1.0))
 	_update_hud()
