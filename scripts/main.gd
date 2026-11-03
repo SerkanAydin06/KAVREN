@@ -24,6 +24,11 @@ const WALK_SPEED := 4.0
 const RUN_SPEED := 7.0
 const MODEL_HEIGHT := 1.8
 const GRAVITY := 18.0
+# Tek bir dosyadan tum araziyi kaplayan seam-free malzeme.
+const GROUND_ALBEDO := preload("res://assets/ground/ashvale_soil_grass_1024.webp")
+const GROUND_SHADER := preload("res://assets/ground/ashvale_ground.gdshader")
+const GROUND_SIZE := 160.0
+const GROUND_TILE_METERS := 4.0
 const ATTACK_PLAYBACK_SPEED := 3.0 # 2.27 sn'lik FBX hareketi ~0.76 sn'de oynat.
 
 var player: CharacterBody3D
@@ -79,21 +84,27 @@ func _make_world() -> void:
 	var ground := StaticBody3D.new()
 	ground.name = "Ground"
 	add_child(ground)
-	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(80, 0.4, 80)
-	mesh.mesh = box
-	mesh.position.y = -0.2
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.25, 0.39, 0.27)
-	mesh.material_override = mat
-	ground.add_child(mesh)
+	# Dusuk poligonlu tek bir yuzey; tekrar eden 1024px PBR dokusu.
+	var surface := MeshInstance3D.new()
+	surface.name = "TerrainSurface"
+	var ground_mesh := PlaneMesh.new()
+	ground_mesh.size = Vector2(GROUND_SIZE, GROUND_SIZE)
+	surface.mesh = ground_mesh
+	var terrain_material := ShaderMaterial.new()
+	terrain_material.shader = GROUND_SHADER
+	terrain_material.set_shader_parameter("ground_albedo", GROUND_ALBEDO)
+	terrain_material.set_shader_parameter("meters_per_tile", GROUND_TILE_METERS)
+	surface.material_override = terrain_material
+	ground.add_child(surface)
+	# Gorunmeyen fizik kutusu: ust seviyesi tam y=0.
 	var collider := CollisionShape3D.new()
+	collider.name = "TerrainCollider"
 	var shape := BoxShape3D.new()
-	shape.size = Vector3(80, 0.4, 80)
+	shape.size = Vector3(GROUND_SIZE, 0.4, GROUND_SIZE)
 	collider.shape = shape
 	collider.position.y = -0.2
 	ground.add_child(collider)
+	print("Ashvale ground: ", GROUND_SIZE, "m | ", GROUND_ALBEDO.get_width(), "px | tile ", GROUND_TILE_METERS, "m")
 
 func _add_primitive(parent: Node3D, shape_mesh: Mesh, pos: Vector3, tint: Color) -> MeshInstance3D:
 	var item := MeshInstance3D.new()

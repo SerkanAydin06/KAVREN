@@ -91,3 +91,13 @@ Godot Actions testi artık kemik hareketini, geçişleri, klip oynatma hızını
 `Walking.fbx` karakterin **mesh/doku kaynağı** olarak kalmalı; değiştirmene gerek yok.
 
 Mixamo'dan hareket eden yürüyüş animasyonunu **FBX Without Skin**, tercihen **In Place** seçili olarak indir ve dosya adını `Walking_Animated.fbx` yaparak `assets/characters/Char1/` klasörüne ekle. Godot animasyonu ayrı yükler ve iskelete aktarır. Dinamik kemik hareketi varsa gerçek `Walk` otomatik kullanılır, yoksa yavaşlatılmış `Run` yedeği aktif kalır.
+
+## 2026-11-03 — Yeni zemin malzemesi
+
+Zemin artık `160 × 160 metre` `PlaneMesh` üzerinde, komple örten `StaticBody3D` çarpışma kutusuyla çalışır. Önceki tek renkli yüzey kaldırıldı. Arazi kaplaması, üretilmiş toprak/çimen görselinin **1024 × 1024 dikişsiz WebP** sürümüdür ve doğrudan GitHub'a eklenmiştir:
+
+- `assets/ground/ashvale_soil_grass_1024.webp` — gerçek zemin dokusu
+- `assets/ground/ashvale_ground.gdshader` — dünya koordinatlarına bağlı 4m tekrar, makro renk/görsel varyasyon, anisotropik mipmap filtreleme ve hafif yüzey kabartması
+- `tests/ground_diagnostics.gd` — 1024px görsel, shader, döşeme ve çarpışma doğrulaması
+
+Zemin **tek bir 160 metreye gerilmiş resim değildir**; 4m tekrar ile bütün yüzeye kaplanır. Yeniden boyutlandırılabilir. Ayarlamak isterseniz `scripts/main.gd` içindeki `GROUND_SIZE` ve `GROUND_TILE_METERS` sabitlerini değiştirin. Yüksek çözünürlüklü PNG kaynak görseli konuşmadaki indirme bağlantısında da mevcut.

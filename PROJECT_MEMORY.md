@@ -75,3 +75,9 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - `Walking.fbx` statik poz (gerçek Walk yok) beklenen durum; `push_warning` yerine yalnızca açıklayıcı `print` kaydı bırakıldı. Mevcut 0,65× Run yürüyüş yedeği korundu.
 - `ATTACK_PLAYBACK_SPEED = 3.0` ile saldırı yaklaşık 2,27 saniyeden 0,76 saniyeye indirildi, `attack_remaining` süre hesabı gerçek playback hızına eşitlendi ve geçiş blend'i 0,05 saniyeye kısaltıldı.
 - `tests/character_animation_diagnostics.gd` içerisine saldırı playback hızı ve süresi için otomatik doğrulama eklendi; GitHub Actions ve Windows görsel test sonucu ayrıca incelenmeli.
+
+## 2026-11-03 — Profesyonel dikişsiz zemin
+- Önceki üretilen toprak/çimen üstten görünüşü 1024px kare dikişsiz şekilde hazırlandı ve WebP q78 (150 KB) olarak `assets/ground/ashvale_soil_grass_1024.webp` dosyasına eklendi.
+- `scripts/main.gd`: eski tek renkli 80m kutu yerine 160m PlaneMesh ve aynı alanı kaplayan gizli statik fizik şekli; ShaderMaterial ile 4m/materyal tekrar.
+- `assets/ground/ashvale_ground.gdshader`: dünya koordinatlı seamless UV, mipmap/anisotropic tekrar, makro gürültü ile tekrar deseninin yumuşatılması, dokudan türetilen hafif normal/roughness.
+- `tests/ground_diagnostics.gd` ve CI: texture, mesh boyutu, shader ve çarpışma kontrolü. Son GitHub Actions sonucu ayrıca doğrulanmalı.
