@@ -16,7 +16,7 @@ const PRIORITY_CHARACTER_FILES := [
 	"res://char1.tscn",
 ]
 # Inspector'da bir model seçilirse, otomatik aramadan önce o kullanılır.
-@export_file("*.glb,*.gltf,*.fbx,*.tscn") var character_file: String = ""
+@export_file("*.glb", "*.gltf", "*.fbx", "*.tscn") var character_file: String = ""
 # Meshy modelleri farkli ileri bakis yonlerinde olabilir.
 @export_range(-180.0, 180.0, 1.0) var character_facing_offset := 0.0
 const WALK_SPEED := 4.0

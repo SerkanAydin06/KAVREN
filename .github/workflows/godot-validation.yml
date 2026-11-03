@@ -20,8 +20,22 @@ jobs:
       - name: Import project and check scripts
         shell: bash
         run: |
-          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --editor --import --quit
+          set -o pipefail
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --editor --import --quit 2>&1 | tee godot-import.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR: Failed to load script" godot-import.log; then
+            echo "Godot import reported script errors"
+            exit 1
+          fi
       - name: Run main scene for smoke test
         shell: bash
         run: |
-          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --quit-after 10
+          set -o pipefail
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --quit-after 15 2>&1 | tee godot-smoke.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR: Failed to load script" godot-smoke.log; then
+            echo "Godot scene reported script errors"
+            exit 1
+          fi
+          grep -F "Ashvale character: res://assets/characters/Char1/Walking.fbx" godot-smoke.log
+          grep -F "Ashvale animation imported: Idle" godot-smoke.log
+          grep -F "Ashvale animation imported: Run" godot-smoke.log
+          grep -F "Ashvale animation imported: Attack" godot-smoke.log
