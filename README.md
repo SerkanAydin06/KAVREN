@@ -73,3 +73,15 @@ Depoda `assets/characters/Char1/` içinde dört Mixamo FBX dosyası bulunuyor:
 Başlangıçta `Walking.fbx` yüklenir; diğer FBX dosyalarının iskelet kanalları aynı Skeleton3D'ye eşlenip animasyon kütüphanesine eklenir. Animasyon aktarımı başarısız olursa eski karaktere veya prosedürel hareketlere otomatik düşebilir; Godot çıktısındaki `Ashvale animation imported` kayıtlarını kontrol edin.
 
 **Önemli:** FBX dosyaları Mixamo standardı 67 kemik içeriyor; animasyonların vücuda doğru uygulanması için Godot tarafında gerçek görüntü kontrolü şarttır. Hatalı bir animasyon varsa 3D görünüm, iskelet adları veya klip yolu üzerinden düzeltin.
+
+## 2026-11-03 — Walking.fbx animasyon sorunu ve geçici çözüm
+
+Godot kemik tanılama testinde `Idle.fbx` (11), `Running.fbx` (40) ve saldırı FBX'i (37) kemik hareketi üretiyor. Mevcut **`Walking.fbx` sadece bir sabit poz içeriyor** (birer anahtar kare, hareket eden kemik sıfır). Bu dosya karakter modelini ve dokuları taşımaya devam ediyor; ancak geçerli bir yürüyüş klibi olarak kullanılmıyor.
+
+Oyuncu şimdi:
+- Dururken **Idle**, Shift'le koşarken **Run**, sol tıkta **Attack** kullanıyor.
+- Normal hareket ederken geçerli Walk yoksa **Run klibini 0.65 hızında** oynatıyor. Bu geçici bir animasyon; gerçek yürüyüş adımları için Mixamo'dan hareket içeren **Walking.fbx** yeniden dışa aktarılmalı. Kaydedildiğinde animasyon otomatik algılanır.
+- Karakterin yerinde koşup modelin öne kaymasını engellemek için pelvis/hips yatay kök hareketi temizleniyor.
+- HUD'un `ANİMASYON` satırında şu an seçili hareket görülebilir.
+
+Godot Actions testi artık kemik hareketini, geçişleri, klip oynatma hızını ve kök hareketini kontrol eder.

@@ -38,6 +38,8 @@ var attack_clip := ""
 var attack_remaining := 0.0
 var loaded_character_path := ""
 var character_animation_status := "bekleniyor"
+var current_animation_state := "Bekliyor"
+var walking_animation_fallback := false
 var motion_time := 0.0
 var bone_map: Dictionary = {}
 var neutral_bone_pose: Dictionary = {}
@@ -227,7 +229,7 @@ func _update_hud() -> void:
 	var hint := ""
 	if nearby != null:
 		hint = "\n[E] %s topla" % ("ODUN" if String(nearby.get_meta("resource_type")) == "wood" else "TAŞ")
-	hud.text = "ASHVALE  •  KEŞİF\nODUN  %d     TAŞ  %d\nDAYANIKLILIK  %d%%%s\nKARAKTER  %s  |  %s" % [wood, stone, int(stamina), hint, loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status]
+	hud.text = "ASHVALE  •  KEŞİF\nODUN  %d     TAŞ  %d\nDAYANIKLILIK  %d%%%s\nKARAKTER  %s  |  %s\nANİMASYON  %s" % [wood, stone, int(stamina), hint, loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status, current_animation_state]
 
 func _nearest_resource() -> Node3D:
 	var best: Node3D = null
@@ -337,16 +339,68 @@ func _make_player() -> void:
 			run_clip = imported_run
 		if not imported_attack.is_empty():
 			attack_clip = imported_attack
+		# Mixamo kliplerinde root bone ileri dogru hareket edebilir.
+		# CharacterBody3D zaten hareket ettigi icin yatay root motion cikarilir.
+		for selected_clip in [idle_clip, walk_clip, run_clip, attack_clip]:
+			if not selected_clip.is_empty():
+				_remove_horizontal_root_motion(animator.get_animation(selected_clip))
+		if not walk_clip.is_empty():
+			var walk_animation: Animation = animator.get_animation(walk_clip)
+			if _clip_has_joint_motion(walk_animation):
+				walk_animation.loop_mode = Animation.LOOP_LINEAR
+			else:
+				# Mevcut Walking.fbx sadece tek karelik sabit poz tasiyor.
+				walking_animation_fallback = true
+				walk_clip = ""
+				push_warning("Ashvale: Walking.fbx sabit poz (animasyon yok). Gercek yuruyus FBX yuklenene kadar Running klibi yavas kullanilacak.")
 		if not idle_clip.is_empty():
 			animator.play(idle_clip)
 	if skeleton != null and skeleton.get_bone_count() > 0:
 		_cache_bone_map()
-		character_animation_status = "Klipler" if not run_clip.is_empty() or not walk_clip.is_empty() else "Basit rig hareketi"
+		character_animation_status = "Klipler (Walk yedek)" if walking_animation_fallback else ("Klipler" if not run_clip.is_empty() or not walk_clip.is_empty() else "Basit rig hareketi")
 	else:
 		character_animation_status = "Rig yok"
 		push_warning("Ashvale: secilen karakterde Skeleton3D bulunamadi. Kol/bacak animasyonu icin rig gerekli.")
 	print("Ashvale character: ", loaded_character_path, " | skeleton: ", skeleton != null, " | clips: ", idle_clip, "/", walk_clip, "/", run_clip, "/", jump_clip, "/", attack_clip)
 
+
+
+func _clip_has_joint_motion(animation: Animation) -> bool:
+	if animation == null:
+		return false
+	for track_index in range(animation.get_track_count()):
+		if animation.track_get_type(track_index) != Animation.TYPE_ROTATION_3D:
+			continue
+		var key_count := animation.track_get_key_count(track_index)
+		if key_count < 2:
+			continue
+		var first_rotation: Quaternion = animation.track_get_key_value(track_index, 0)
+		for key_index in range(1, key_count):
+			var other_rotation: Quaternion = animation.track_get_key_value(track_index, key_index)
+			if absf(first_rotation.dot(other_rotation)) < 0.9995:
+				return true
+	return false
+
+
+func _remove_horizontal_root_motion(animation: Animation) -> void:
+	if animation == null:
+		return
+	for track_index in range(animation.get_track_count()):
+		if animation.track_get_type(track_index) != Animation.TYPE_POSITION_3D:
+			continue
+		var track_path := animation.track_get_path(track_index)
+		var bone_name := String(track_path.get_concatenated_subnames()).to_lower()
+		if not bone_name.ends_with("hips") and not bone_name.ends_with("hip"):
+			continue
+		var count := animation.track_get_key_count(track_index)
+		if count == 0:
+			continue
+		var initial_position: Vector3 = animation.track_get_key_value(track_index, 0)
+		for key_index in range(count):
+			var position: Vector3 = animation.track_get_key_value(track_index, key_index)
+			position.x = initial_position.x
+			position.z = initial_position.z
+			animation.track_set_key_value(track_index, key_index, position)
 
 
 func _first_non_reset_clip(player_node: AnimationPlayer) -> String:
@@ -422,6 +476,7 @@ func _start_attack() -> void:
 	if animation == null:
 		return
 	attack_remaining = animation.length
+	current_animation_state = "Attack"
 	animator.speed_scale = 1.0
 	animator.play(attack_clip, 0.12)
 
@@ -564,6 +619,18 @@ func _update_character_animation(delta: float, moving: bool, sprinting: bool) ->
 		attack_remaining = maxf(attack_remaining - delta, 0.0)
 		if attack_remaining > 0.0:
 			return
+	if target == idle_clip and not idle_clip.is_empty():
+		current_animation_state = "Idle"
+	elif target == walk_clip and not walk_clip.is_empty():
+		current_animation_state = "Walking"
+	elif target == run_clip and not run_clip.is_empty():
+		current_animation_state = "Running" if sprinting else "Walking (Run yedek)"
+	elif target == jump_clip and not jump_clip.is_empty():
+		current_animation_state = "Jump"
+	elif target == fall_clip and not fall_clip.is_empty():
+		current_animation_state = "Fall"
+	else:
+		current_animation_state = "Prosedurel" if skeleton != null else "Animasyon yok"
 	if animator != null:
 		if not target.is_empty():
 			if animator.current_animation != target or not animator.is_playing():

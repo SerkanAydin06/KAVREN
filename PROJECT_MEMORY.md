@@ -60,3 +60,10 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - `scripts/main.gd:514`: `_apply_procedural_bone(name: String,...)` parametresi `Node.name` ile çakıştığı için `SHADOWED_VARIABLE_BASE_CLASS` uyarısı veriyordu.
 - Parametre `bone_key` olarak güncellendi ve `bone_map.get` kullanımı eşlendi; tüm scriptte kalan `name` adlı parametre/döngü değişkenleri tarandı.
 - Godot Actions doğrulaması commit sonrasında kontrol edilmeli.
+
+## 2026-11-03 — Animasyon oynatma doğrulaması
+- Godot 4.7.2 gerçek iskelet testleri: Idle 11 hareketli kemik, Running 40, Attack 37, Walking **0**. `Walking.fbx` Godot'ta `Take 001` adıyla 1 saniyelik sabit poz; hips pozisyonu ve rotasyonunda tek anahtar kare var.
+- `scripts/main.gd` yürüyüşün statik klip olmasını rotasyon anahtarlarından algılıyor; varsa dinamik gerçek Walk kullanıyor, yoksa yavaşlatılmış Run animasyonuna geçiyor.
+- FBX animasyonunun gövdeyi kaydırmasını önlemek için hips yatay root motion sıfırlanıyor. Mevcut Walk dinamikse LOOP_LINEAR yapılıyor.
+- HUD gerçek animasyon durumunu gösteriyor. `tests/character_animation_diagnostics.gd` testine kemik hareketi ve Idle/Walk/Run/Attack durum geçişi kontrolleri eklendi.
+- Gereken sanat varlığı: Mixamo'dan gerçek hareketli Walking.fbx yeniden export edilmeli; statik dosyadan gerçek yürüyüş üretilemez.
