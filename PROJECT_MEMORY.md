@@ -81,3 +81,10 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - `scripts/main.gd`: eski tek renkli 80m kutu yerine 160m PlaneMesh ve aynı alanı kaplayan gizli statik fizik şekli; ShaderMaterial ile 4m/materyal tekrar.
 - `assets/ground/ashvale_ground.gdshader`: dünya koordinatlı seamless UV, mipmap/anisotropic tekrar, makro gürültü ile tekrar deseninin yumuşatılması, dokudan türetilen hafif normal/roughness.
 - `tests/ground_diagnostics.gd` ve CI: texture, mesh boyutu, shader ve çarpışma kontrolü. Son GitHub Actions sonucu ayrıca doğrulanmalı.
+
+## 2026-11-04 — Meshy orman FBX modelleri
+- Kullanici 4 adet FBX agac + PNG textures yükledi: `assets/obje/Meshy_AI_Ancient_Oak_Canopy_20261104_texture_fbx`, `Meshy_AI_Emerald_Sentinel_20261104_texture_fbx`, `Meshy_AI_Silverleaf_Birch_1104184945_texture_fbx`, `Meshy_AI_Twisted_Elder_20261104_texture_fbx`.
+- `scripts/main.gd` `_make_camp` agaclarini 24 Meshy FBX instance ile degistirdi; boyut AABB'den normalize edildi; doku aktarimi eksikse PNG atlas fallback uygulaniyor.
+- Agac kesme/toplama `resource_type=wood` sistemi ve silindir govde carpisma korunuyor. Eksik FBX icin basit primitive fallback var ama CI hatayi bildiriyor.
+- Otomatik Godot test: `tests/tree_diagnostics.gd` ile import, geometri, 4 tur, kaynak ve carpisma testleri.
+- Performans ve UV/alpha (yaprak) gorunumu, Godot'ta 3D ekran goruntusunden de incelenmeli; FBX polygon sayilarini CI logu raporlayacak.

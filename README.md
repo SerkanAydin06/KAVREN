@@ -101,3 +101,17 @@ Zemin artık `160 × 160 metre` `PlaneMesh` üzerinde, komple örten `StaticBody
 - `tests/ground_diagnostics.gd` — 1024px görsel, shader, döşeme ve çarpışma doğrulaması
 
 Zemin **tek bir 160 metreye gerilmiş resim değildir**; 4m tekrar ile bütün yüzeye kaplanır. Yeniden boyutlandırılabilir. Ayarlamak isterseniz `scripts/main.gd` içindeki `GROUND_SIZE` ve `GROUND_TILE_METERS` sabitlerini değiştirin. Yüksek çözünürlüklü PNG kaynak görseli konuşmadaki indirme bağlantısında da mevcut.
+
+## 4 Meshy agac modelinin entegrasyonu (4 Kasim 2026)
+
+`assets/obje` altinda 4 tur kullaniliyor: Ancient Oak Canopy (mese), Emerald Sentinel (cam), Silverleaf Birch (hus) ve Twisted Elder (yasli kuru agac). Her birinin kendi FBX ve ayni klasorde PNG kaplamasi var.
+
+- `scripts/main.gd` `TREE_MODEL_PATHS` ve `TREE_TEXTURE_PATHS` sabitleri 4 varligi baglar.
+- 24 agac, sabit tohumlu dogal dagilimla 160m zemine yerlestirilir; her agacin boyu ve donusu degisir.
+- Agaclar bir kez `PackedScene` olarak yuklenip instance edilir: ayni turdekiler mesh/texture kaynagini paylasir.
+- Ağaçların kökleri zemine oturur: import edilen mesh için AABB hesaplanır, yükseklik ayarlanır ve modelin tabanı y=0 olur.
+- Govedeki yaklasik `StaticBody3D` silindiri karakter carpisma saglar; `E` odun toplama etkisi korunur.
+- Model FBX'ten dokusuz gelirse yanindaki Meshy PNG'si eksik malzemeye otomatik atanir.
+- FBX yoksa gecici basit agac fallback'i olur; CI modeli bulamadiginda basarisiz sayar.
+- `tests/tree_diagnostics.gd` Godot headless importu, dort turun geometrisi, sahne ornekleri, carpisma ve kaplama varligini kontrol eder. Ayrintili ucgen sayilari test logunda gosterilir.
+- FBX'ler agir cikar ve orman binlerce agaca buyutulurse LOD veya MultiMesh kullanilmali. Bu 24 agaclik prototip icin baslangic entegrasyonudur.

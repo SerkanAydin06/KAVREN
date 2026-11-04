@@ -30,6 +30,23 @@ const GROUND_SHADER := preload("res://assets/ground/ashvale_ground.gdshader")
 const GROUND_SIZE := 160.0
 const GROUND_TILE_METERS := 4.0
 const ATTACK_PLAYBACK_SPEED := 3.0 # 2.27 sn'lik FBX hareketi ~0.76 sn'de oynat.
+# Tekrarlanan FBX sahneleri paylasilan Mesh/Texture kaynaklarini kullanir.
+const TREE_MODEL_PATHS := [
+	"res://assets/obje/Meshy_AI_Ancient_Oak_Canopy_20261104_texture_fbx/Meshy_AI_Ancient_Oak_Canopy_20261104_texture.fbx",
+	"res://assets/obje/Meshy_AI_Emerald_Sentinel_20261104_texture_fbx/Meshy_AI_Emerald_Sentinel_20261104_texture.fbx",
+	"res://assets/obje/Meshy_AI_Silverleaf_Birch_1104184945_texture_fbx/Meshy_AI_Silverleaf_Birch_1104184945_texture.fbx",
+	"res://assets/obje/Meshy_AI_Twisted_Elder_20261104_texture_fbx/Meshy_AI_Twisted_Elder_20261104_texture.fbx",
+]
+const TREE_TEXTURE_PATHS := [
+	"res://assets/obje/Meshy_AI_Ancient_Oak_Canopy_20261104_texture_fbx/Meshy_AI_Ancient_Oak_Canopy_20261104_texture.png",
+	"res://assets/obje/Meshy_AI_Emerald_Sentinel_20261104_texture_fbx/Meshy_AI_Emerald_Sentinel_20261104_texture.png",
+	"res://assets/obje/Meshy_AI_Silverleaf_Birch_1104184945_texture_fbx/Meshy_AI_Silverleaf_Birch_1104184945_texture.png",
+	"res://assets/obje/Meshy_AI_Twisted_Elder_20261104_texture_fbx/Meshy_AI_Twisted_Elder_20261104_texture.png",
+]
+const TREE_NAMES := ["Oak", "Pine", "Birch", "Elder"]
+const TREE_HEIGHTS := [8.0, 10.0, 8.7, 7.0]
+const TREE_TRUNK_RADII := [0.62, 0.40, 0.37, 0.55]
+const TREE_COUNT := 24
 
 var player: CharacterBody3D
 var visuals: Node3D
@@ -116,37 +133,108 @@ func _add_primitive(parent: Node3D, shape_mesh: Mesh, pos: Vector3, tint: Color)
 	parent.add_child(item)
 	return item
 
+func _ensure_tree_texture(model_root: Node3D, texture_path: String) -> void:
+	# FBX malzemesi dokusuz gelirse ayni klasordeki Meshy atlasini bagla.
+	var resource: Resource = load(texture_path) if ResourceLoader.exists(texture_path) else null
+	if not resource is Texture2D:
+		return
+	var texture := resource as Texture2D
+	var fallback_material := StandardMaterial3D.new()
+	fallback_material.albedo_texture = texture
+	fallback_material.roughness = 0.88
+	fallback_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var nodes: Array[Node] = [model_root]
+	while not nodes.is_empty():
+		var current: Node = nodes.pop_back()
+		if current is MeshInstance3D:
+			var mesh_node := current as MeshInstance3D
+			if mesh_node.mesh != null:
+				for surface_index in range(mesh_node.mesh.get_surface_count()):
+					var active_material := mesh_node.get_active_material(surface_index)
+					var missing_texture := active_material == null
+					if active_material is BaseMaterial3D:
+						missing_texture = (active_material as BaseMaterial3D).albedo_texture == null
+					if missing_texture:
+						mesh_node.set_surface_override_material(surface_index, fallback_material)
+		for child in current.get_children():
+			nodes.append(child)
+
+
+func _make_placeholder_tree(tree_root: Node3D, height_meters: float) -> void:
+	# Model basarisiz olursa oyuncu tamamen agacsiz kalmasin.
+	var trunk := CylinderMesh.new()
+	trunk.top_radius = 0.26
+	trunk.bottom_radius = 0.36
+	trunk.height = height_meters * 0.5
+	_add_primitive(tree_root, trunk, Vector3(0, trunk.height * 0.5, 0), Color(0.35, 0.21, 0.12))
+	var crown := SphereMesh.new()
+	crown.radius = height_meters * 0.19
+	crown.height = height_meters * 0.52
+	_add_primitive(tree_root, crown, Vector3(0, height_meters * 0.71, 0), Color(0.16, 0.30, 0.15))
+
+
 func _make_camp() -> void:
-	# Lightweight test environment suitable for Compatibility renderer.
-	for i in range(16):
-		var angle := float(i) * TAU / 16.0
-		var distance := 9.0 + float(i % 4) * 3.5
-		var pos := Vector3(cos(angle) * distance, 0.0, sin(angle) * distance)
+	# Meshy'nin dort farkli agaci ayni mesh/texture kaynaklarini paylasir.
+	# Prototipte 24 agac: karakterin etrafinda dogal, tekrar etmeyen yerlestirme.
+	var forest_scenes: Array[PackedScene] = []
+	for model_path in TREE_MODEL_PATHS:
+		var packed: PackedScene = null
+		if ResourceLoader.exists(model_path):
+			var model_resource: Resource = load(model_path)
+			if model_resource is PackedScene:
+				packed = model_resource as PackedScene
+		if packed == null:
+			push_warning("Ashvale: Agac modeli yuklenemedi: " + String(model_path))
+		forest_scenes.append(packed)
+	var tree_random := RandomNumberGenerator.new()
+	tree_random.seed = 20261104
+	for i in range(TREE_COUNT):
+		var kind := i % TREE_MODEL_PATHS.size()
+		var direction_angle := TAU * (float(i) + tree_random.randf_range(-0.3, 0.3)) / float(TREE_COUNT)
+		var distance := tree_random.randf_range(13.0, 48.0)
+		var tree_pos := Vector3(cos(direction_angle) * distance, 0.0, sin(direction_angle) * distance)
 		var tree := Node3D.new()
-		tree.name = "Tree_%02d" % i
-		tree.position = pos
+		tree.name = "%s_%02d" % [TREE_NAMES[kind], i]
+		tree.position = tree_pos
+		tree.rotation.y = tree_random.randf_range(0.0, TAU)
 		add_child(tree)
-		var trunk := CylinderMesh.new()
-		trunk.top_radius = 0.22
-		trunk.bottom_radius = 0.33
-		trunk.height = 2.4
-		_add_primitive(tree, trunk, Vector3(0, 1.2, 0), Color(0.36, 0.23, 0.13))
-		var tree_body := StaticBody3D.new()
-		tree_body.name = "TrunkBody"
-		tree.add_child(tree_body)
-		var tree_collision := CollisionShape3D.new()
+		var size_factor := tree_random.randf_range(0.84, 1.18)
+		var tree_height: float = float(TREE_HEIGHTS[kind]) * size_factor
+		if forest_scenes[kind] != null:
+			var tree_model := forest_scenes[kind].instantiate()
+			if tree_model is Node3D:
+				var model_node := tree_model as Node3D
+				model_node.name = "Model"
+				tree.add_child(model_node)
+				var bounds := _measure_model_bounds(model_node)
+				if bounds.size.y > 0.01:
+					var uniform_scale := tree_height / bounds.size.y
+					model_node.scale = Vector3.ONE * uniform_scale
+					var offset_x := bounds.position.x + bounds.size.x * 0.5
+					var offset_z := bounds.position.z + bounds.size.z * 0.5
+					model_node.position = Vector3(-offset_x, -bounds.position.y, -offset_z) * uniform_scale
+				_ensure_tree_texture(model_node, String(TREE_TEXTURE_PATHS[kind]))
+			else:
+				tree_model.queue_free()
+				_make_placeholder_tree(tree, tree_height)
+		else:
+			_make_placeholder_tree(tree, tree_height)
+		var trunk_body := StaticBody3D.new()
+		trunk_body.name = "TrunkBody"
+		tree.add_child(trunk_body)
+		var trunk_collision := CollisionShape3D.new()
+		trunk_collision.name = "CollisionShape3D"
 		var trunk_shape := CylinderShape3D.new()
-		trunk_shape.radius = 0.29
-		trunk_shape.height = 2.4
-		tree_collision.shape = trunk_shape
-		tree_collision.position.y = 1.2
-		tree_body.add_child(tree_collision)
-		var crown := SphereMesh.new()
-		crown.radius = 1.35
-		crown.height = 2.5
-		_add_primitive(tree, crown, Vector3(0, 3.1, 0), Color(0.15, 0.34 + 0.02 * (i % 3), 0.17))
+		trunk_shape.radius = float(TREE_TRUNK_RADII[kind]) * size_factor
+		trunk_shape.height = minf(tree_height * 0.46, 3.8)
+		trunk_collision.shape = trunk_shape
+		trunk_collision.position.y = trunk_shape.height * 0.5
+		trunk_body.add_child(trunk_collision)
 		tree.set_meta("resource_type", "wood")
+		tree.set_meta("tree_species", String(TREE_NAMES[kind]))
 		resource_nodes.append(tree)
+	print("Ashvale forest: ", TREE_COUNT, " trees / ", TREE_MODEL_PATHS.size(), " species")
+
 	for i in range(12):
 		var angle := float(i) * TAU / 12.0 + 0.23
 		var distance := 5.5 + float(i % 3) * 4.0

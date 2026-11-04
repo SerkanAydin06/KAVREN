@@ -60,3 +60,14 @@ jobs:
             exit 1
           fi
           grep -F "AshvaleGroundTest passed:" godot-ground.log
+
+      - name: Validate Meshy tree imports and forest collision
+        shell: bash
+        run: |
+          set -o pipefail
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/tree_diagnostics.gd 2>&1 | tee godot-forest.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-forest.log; then
+            echo "Forest import or resource test reported errors"
+            exit 1
+          fi
+          grep -F "AshvaleTreeTest failures=0" godot-forest.log
