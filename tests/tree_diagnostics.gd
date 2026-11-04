@@ -30,8 +30,8 @@ func _run() -> void:
 				if mesh_node.mesh != null:
 					mesh_count += 1
 					for surface_index in range(mesh_node.mesh.get_surface_count()):
-						var surface_indices := mesh_node.mesh.surface_get_array_index_len(surface_index)
-						var surface_vertices := mesh_node.mesh.surface_get_array_len(surface_index)
+						var surface_indices: int = mesh_node.mesh.surface_get_array_index_len(surface_index)
+						var surface_vertices: int = mesh_node.mesh.surface_get_array_len(surface_index)
 						triangle_count += (surface_indices if surface_indices > 0 else surface_vertices) / 3
 						var mat := mesh_node.get_active_material(surface_index)
 						if mat is BaseMaterial3D and (mat as BaseMaterial3D).albedo_texture != null:
