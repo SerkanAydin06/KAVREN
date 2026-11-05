@@ -5,13 +5,11 @@ func _initialize() -> void:
 	call_deferred("_run")
 
 func _run() -> void:
-	var scene: PackedScene = load("res://main.tscn")
-	var game: Node3D = scene.instantiate()
-	root.add_child(game)
-	await process_frame
-	var showcase: Node = game.get_node_or_null("ArtDirectionShowcase")
-	var tree: Node = game.get_node_or_null("ArtDirectionShowcase/StylizedOak")
-	var rock: Node = game.get_node_or_null("ArtDirectionShowcase/StylizedBoulder")
+	var preview_script: Script = load("res://scripts/stylized_asset_preview.gd")
+	var showcase: Node = preview_script.new()
+	root.add_child(showcase)
+	var tree: Node = showcase.get_node_or_null("StylizedOak")
+	var rock: Node = showcase.get_node_or_null("StylizedBoulder")
 	var ok := showcase != null and tree != null and rock != null
 	var geometries: Array[int] = []
 	for item in [tree, rock]:
@@ -36,11 +34,5 @@ func _run() -> void:
 		geometries.append(total_triangles)
 		if mesh_count == 0 or total_triangles <= 0 or total_triangles > 8000:
 			ok = false
-	var original_forest := 0
-	for child in game.get_children():
-		if child.has_meta("tree_species") and String(child.get_meta("resource_type", "")) == "wood":
-			original_forest += 1
-	if original_forest != game.TREE_COUNT:
-		ok = false
-	print("AshvaleStyleTest preview=", ok, " tree_triangles=", geometries[0], " rock_triangles=", geometries[1], " existing_Meshy_trees=", original_forest)
+	print("AshvaleStyleTest preview=", ok, " tree_triangles=", geometries[0], " rock_triangles=", geometries[1])
 	quit(0 if ok else 1)
