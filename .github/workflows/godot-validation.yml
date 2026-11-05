@@ -106,3 +106,14 @@ jobs:
           fi
           grep -F "AshvaleWeaponTest bone=" godot-weapon.log
           grep -F "failures=0" godot-weapon.log
+
+      - name: Validate dedicated keyframed axe swing and impact timing
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 100s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/axe_swing_diagnostics.gd 2>&1 | tee godot-axe-animation.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-axe-animation.log; then
+            echo "Dedicated axe animation validation reported errors"
+            exit 1
+          fi
+          grep -F "AshvaleAxeSwingTest failures=0" godot-axe-animation.log

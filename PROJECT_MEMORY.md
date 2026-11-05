@@ -110,3 +110,9 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - `scripts/main.gd` `_make_axe`: Mount dünya ölçeğini ölçüyor; balta ve el kavrama pozisyonunun local ölçeği ters çarpanla düzeltiliyor. `equipped_axe`/`axe_attachment` referansları tanımlı.
 - `scripts/stylized_axe.gd` netleştirilmiş metal balta başlığı, kesici kenar ve sap tutamakları içeriyor.
 - `tests/weapon_equipment_diagnostics.gd`: Char1 sağ el kemiği, gerçek dünya ölçeği, geometri, montaj mesafesi kontrolü. CI'a eklendi. Gerçek Windows görsel kontrolü halen ayrıca gerekir.
+
+## 2026-11-05 — Ayrı balta animasyonu
+- Önceki yumruk animasyonu artık Char1 varsayılan saldırısı değil. `scripts/axe_chop_animation.gd` Mixamo iskeletine Godot Rotation3D track'leriyle özel `Ashvale/AxeChop` ekler.
+- 0.76 saniyelik (2.28 / 3) animasyon: anticipation, overhead raise, downward impact, follow-through, recover. Darbe 0.25 s ve `CHOP_IMPACT_DELAY` ile eşleşir.
+- Eski saldırı FBX'i import yedeği olarak kalır.
+- `tests/axe_swing_diagnostics.gd`: gerçek aktif kemik track'leri, el hareketi, ekipman, darbe senkronizasyonu, klip süresi ve cooldown kontrolü.

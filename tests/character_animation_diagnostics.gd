@@ -75,10 +75,14 @@ func _run() -> void:
 	var running_speed_ok: bool = absf(player_node.speed_scale - 1.0) < 0.01
 	game._start_attack()
 	var attack_state_ok: bool = player_node.current_animation == game.attack_clip
+	var dedicated_axe_ok: bool = game.attack_clip == "Ashvale/AxeChop"
+	if not dedicated_axe_ok:
+		clip_failures += 1
+		print("AshvaleAnimTest dedicated axe clip MISSING: ", game.attack_clip)
 	var attack_speed_ok: bool = is_equal_approx(player_node.speed_scale, game.ATTACK_PLAYBACK_SPEED)
 	var expected_attack_seconds: float = player_node.get_animation(game.attack_clip).length / game.ATTACK_PLAYBACK_SPEED
 	var attack_duration_ok: bool = is_equal_approx(game.attack_remaining, expected_attack_seconds)
-	print("AshvaleAnimTest STATES idle=", idle_state_ok, " walking=", walking_state_ok, " walk_speed=", walking_speed_ok, " running=", running_state_ok, " run_speed=", running_speed_ok, " attack=", attack_state_ok, " attack_speed=", attack_speed_ok, " attack_duration=", attack_duration_ok)
+	print("AshvaleAnimTest STATES idle=", idle_state_ok, " walking=", walking_state_ok, " walk_speed=", walking_speed_ok, " running=", running_state_ok, " run_speed=", running_speed_ok, " attack=", attack_state_ok, " attack_speed=", attack_speed_ok, " attack_duration=", attack_duration_ok, " dedicated_axe=", dedicated_axe_ok)
 	if not idle_state_ok or not walking_state_ok or not walking_speed_ok or not running_state_ok or not running_speed_ok or not attack_state_ok or not attack_speed_ok or not attack_duration_ok:
 		clip_failures += 1
 	# Root bone yatay konumunu koruyor mu?

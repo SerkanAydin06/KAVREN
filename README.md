@@ -136,3 +136,7 @@ Dusuk geometri, siluet ve ayni renk paleti hedeflendi. Bu modeller Godot kodunda
 ## Görünür balta düzeltmesi (2026-11-05)
 
 Char1 FBX iskelet/modeli genellikle santimetre ölçeğiyle geliyor. Oyuncu modelini 1,8 metreye küçültürken sağ el kemiğine eklenen ilk balta da aynı küçültmeye uğruyordu. Balta mesh'i artık parent node'un global ölçeğiyle **ters orantılı** ayarlanıyor; böylece gerçek boyutu yaklaşık 0,8 metre kalıyor. Yerel pozisyon ofseti de aynı şekilde dönüştürülüyor. `AxeRightHand` iskelet kemiği takip ediliyor, model görünür ve daha okunaklı kama biçimli bir balta başlığı kullanıyor. `tests/weapon_equipment_diagnostics.gd` el bağlantısı, dünya ölçeği, parça sayısı ve mesafe için otomatik test içeriyor.
+
+## Ayrı balta savurma animasyonu — 2026-11-05
+
+`scripts/axe_chop_animation.gd` gerçek Char1 Mixamo iskeletine, Idle pozundan türetilmiş, 2.28 saniyelik keyframe tabanlı `Ashvale/AxeChop` animasyonu kaydeder. Oyun klibi 3x hızda oynatarak 0.76 saniyelik bir balta savurma hareketi üretir. Gövde, kalça, sağ omuz, sağ üst/alt kol ve bilek ile sol kolun karşı hareketi ayrı rotasyon kanallarıyla animasyonlanır. Animasyonun 0.75 saniyelik iç zamanında (gerçekte 0.25 s) balta ağaca vurur. Önceki `Standing Melee Attack Downward.fbx` yedek olarak saklanır ama normal Char1 baltasında kullanılmaz. `tests/axe_swing_diagnostics.gd` özel klip, hareketli bilek kanalları, darbe zamanlaması ve ekipman varlığı testlerini yapar. Görsel ince ayar için oyun içi video/ekran görüntüsü hâlâ değerlidir.

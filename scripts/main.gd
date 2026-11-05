@@ -30,10 +30,11 @@ const GROUND_SHADER := preload("res://assets/ground/ashvale_ground.gdshader")
 const GROUND_SIZE := 160.0
 const GROUND_TILE_METERS := 4.0
 const STYLIZED_PREVIEW_SCENE := preload("res://scripts/stylized_asset_preview.gd")
+const AXE_CHOP_ANIMATION := preload("res://scripts/axe_chop_animation.gd")
 const CHOPPABLE_TREE_SCRIPT := preload("res://scripts/choppable_tree.gd")
 const AXE_SCRIPT := preload("res://scripts/stylized_axe.gd")
 const CHOP_RANGE := 3.4
-const CHOP_IMPACT_DELAY := 0.23
+const CHOP_IMPACT_DELAY := 0.25
 const ATTACK_PLAYBACK_SPEED := 3.0 # 2.27 sn'lik FBX hareketi ~0.76 sn'de oynat.
 # Tekrarlanan FBX sahneleri paylasilan Mesh/Texture kaynaklarini kullanir.
 const TREE_MODEL_PATHS := [
@@ -515,6 +516,10 @@ func _make_player() -> void:
 			run_clip = imported_run
 		if not imported_attack.is_empty():
 			attack_clip = imported_attack
+		# Gameplay now uses a dedicated axe swing, not the unarmed FBX clip.
+		var dedicated_axe_clip: String = AXE_CHOP_ANIMATION.create(skeleton, animator, idle_clip)
+		if not dedicated_axe_clip.is_empty():
+			attack_clip = dedicated_axe_clip
 		# Mixamo kliplerinde root bone ileri dogru hareket edebilir.
 		# CharacterBody3D zaten hareket ettigi icin yatay root motion cikarilir.
 		for selected_clip in [idle_clip, walk_clip, run_clip, attack_clip]:
@@ -655,6 +660,8 @@ func _start_attack() -> void:
 	current_animation_state = "Attack"
 	animator.speed_scale = ATTACK_PLAYBACK_SPEED
 	animator.play(attack_clip, 0.05)
+	# Stationary axe swings should face the tree/camera direction as well.
+	visuals.rotation.y = yaw + PI + deg_to_rad(character_facing_offset)
 	pending_chop_target = _nearest_choppable_tree()
 	pending_chop_timer = CHOP_IMPACT_DELAY if pending_chop_target != null else 0.0
 
