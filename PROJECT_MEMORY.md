@@ -96,3 +96,10 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - Konumlar (-4.5,0,-8.5) ve (4.5,0,-8.5); etiket, basit carpisma, mat renk paleti var.
 - `tests/stylized_preview_diagnostics.gd` geometri, uclu boyut butcesi, iki collider ve 24 eski agacin durumu icin CI testi.
 - Bu stil denemesi Meshy uretimi degil ve yakin incelemede son sanat eseri sayilmaz. Uygun bulunursa asil FBX/GLB assetleri ayni tasarim kurallariyla uretilecek.
+
+## 2026-11-05 — Agac kesme mekanigi
+- 3 baltali darbe, Char1 animasyonu ile gecikmeli darbe zamani (0.23 s), 3.4m hedefleme; `_nearest_choppable_tree()` kameranin baktigi agaci secer.
+- `scripts/choppable_tree.gd`: Kesik izleri ve kiymik parcaciklari, hafif sarsinti, 0.95s kontrollu devrilme, kütük ve `wood_drop` tipi 3 toplama parcasi.
+- `scripts/stylized_axe.gd` basit stilize balta modeli; Mixamo sag el kemigine BoneAttachment3D ile baglanir.
+- `resource_type=wood` artik aninda E ile toplanmaz. `resource_type=wood_drop` E ile odun, stone E ile tas olarak toplanir.
+- 24 Meshy FBX ve yakin demo stylized oak kesilebilir. `tests/chopping_diagnostics.gd` ile uc darbe, cooldown, kütük, loot ve E testi CI'a eklendi.

@@ -83,3 +83,14 @@ jobs:
             exit 1
           fi
           grep -F "AshvaleStyleTest preview=true" godot-style.log
+
+      - name: Validate axe hits, falling trees and wood pickups
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 100s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/chopping_diagnostics.gd 2>&1 | tee godot-chopping.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-chopping.log; then
+            echo "Tree chopping integration reported errors"
+            exit 1
+          fi
+          grep -F "AshvaleChopTest hits=3 fall=true drops=3 stump=true preview_tree=true failures=0" godot-chopping.log

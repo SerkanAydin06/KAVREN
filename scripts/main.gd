@@ -30,6 +30,10 @@ const GROUND_SHADER := preload("res://assets/ground/ashvale_ground.gdshader")
 const GROUND_SIZE := 160.0
 const GROUND_TILE_METERS := 4.0
 const STYLIZED_PREVIEW_SCENE := preload("res://scripts/stylized_asset_preview.gd")
+const CHOPPABLE_TREE_SCRIPT := preload("res://scripts/choppable_tree.gd")
+const AXE_SCRIPT := preload("res://scripts/stylized_axe.gd")
+const CHOP_RANGE := 3.4
+const CHOP_IMPACT_DELAY := 0.23
 const ATTACK_PLAYBACK_SPEED := 3.0 # 2.27 sn'lik FBX hareketi ~0.76 sn'de oynat.
 # Tekrarlanan FBX sahneleri paylasilan Mesh/Texture kaynaklarini kullanir.
 const TREE_MODEL_PATHS := [
@@ -76,10 +80,13 @@ var wood := 0
 var stone := 0
 var stamina := 100.0
 var camera_distance := 5.0
+var pending_chop_target: Node3D = null
+var pending_chop_timer := 0.0
 
 func _ready() -> void:
 	_make_world()
 	_make_player()
+	_make_axe()
 	_make_camera()
 	_make_camp()
 	_make_stylized_preview()
@@ -126,10 +133,14 @@ func _make_world() -> void:
 	print("Ashvale ground: ", GROUND_SIZE, "m | ", GROUND_ALBEDO.get_width(), "px | tile ", GROUND_TILE_METERS, "m")
 
 func _make_stylized_preview() -> void:
-	# Prototip karsilastirmasi: mevcut Meshy agaclari degistirmeden yakina iki ornek ekle.
+	# Karsilastirma agaci da yeni kesme mekanigini kullanir.
 	var preview := STYLIZED_PREVIEW_SCENE.new()
 	preview.name = "ArtDirectionShowcase"
 	add_child(preview)
+	var preview_oak := preview.get_node_or_null("StylizedOak") as Node3D
+	if preview_oak != null:
+		preview_oak.connect("wood_dropped", Callable(self, "_register_wood_drops"))
+		resource_nodes.append(preview_oak)
 	print("Ashvale style preview: stylized tree + rock added")
 
 
@@ -203,8 +214,9 @@ func _make_camp() -> void:
 		var direction_angle := TAU * (float(i) + tree_random.randf_range(-0.3, 0.3)) / float(TREE_COUNT)
 		var distance := tree_random.randf_range(13.0, 48.0)
 		var tree_pos := Vector3(cos(direction_angle) * distance, 0.0, sin(direction_angle) * distance)
-		var tree := Node3D.new()
+		var tree := CHOPPABLE_TREE_SCRIPT.new()
 		tree.name = "%s_%02d" % [TREE_NAMES[kind], i]
+		tree.connect("wood_dropped", Callable(self, "_register_wood_drops"))
 		tree.position = tree_pos
 		tree.rotation.y = tree_random.randf_range(0.0, TAU)
 		add_child(tree)
@@ -330,7 +342,7 @@ func _make_hud() -> void:
 	controls.add_theme_color_override("font_shadow_color", Color.BLACK)
 	controls.add_theme_constant_override("shadow_offset_x", 2)
 	controls.add_theme_constant_override("shadow_offset_y", 2)
-	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Topla\nFARE  Kamera / Zoom    SOL TIK  Saldırı    ESC  İmleç    F11  Tam Ekran"
+	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Odun / Taş Topla\nFARE  Kamera / Zoom    SOL TIK  Balta / Saldırı    ESC  İmleç    F11  Tam Ekran"
 	controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(controls)
 	_update_hud()
@@ -339,14 +351,21 @@ func _update_hud() -> void:
 	var nearby := _nearest_resource()
 	var hint := ""
 	if nearby != null:
-		hint = "\n[E] %s topla" % ("ODUN" if String(nearby.get_meta("resource_type")) == "wood" else "TAŞ")
+		hint = "\n[E] %s topla" % ("ODUN" if String(nearby.get_meta("resource_type")) == "wood_drop" else "TAŞ")
+	else:
+		var nearby_tree := _nearest_choppable_tree()
+		if nearby_tree != null:
+			hint = "\n[SOL TIK] AGACI KES (%d/%d)" % [nearby_tree.hits_taken, nearby_tree.MAX_HITS]
 	hud.text = "ASHVALE  •  KEŞİF\nODUN  %d     TAŞ  %d\nDAYANIKLILIK  %d%%%s\nKARAKTER  %s  |  %s\nANİMASYON  %s" % [wood, stone, int(stamina), hint, loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status, current_animation_state]
 
 func _nearest_resource() -> Node3D:
 	var best: Node3D = null
 	var best_distance := 3.0
 	for node in resource_nodes:
-		if not is_instance_valid(node):
+		if not is_instance_valid(node) or node.is_queued_for_deletion():
+			continue
+		var resource_kind := String(node.get_meta("resource_type", ""))
+		if resource_kind != "wood_drop" and resource_kind != "stone":
 			continue
 		var distance := player.global_position.distance_to(node.global_position)
 		if distance < best_distance:
@@ -354,17 +373,58 @@ func _nearest_resource() -> Node3D:
 			best = node
 	return best
 
+func _nearest_choppable_tree() -> Node3D:
+	var best: Node3D = null
+	var best_distance := CHOP_RANGE
+	var forward := Basis(Vector3.UP, yaw) * Vector3.FORWARD
+	for node in resource_nodes:
+		if not is_instance_valid(node) or node.is_queued_for_deletion():
+			continue
+		if String(node.get_meta("resource_type", "")) != "wood" or not node.has_method("take_axe_hit"):
+			continue
+		var relative := node.global_position - player.global_position
+		relative.y = 0.0
+		var distance := relative.length()
+		if distance >= best_distance or distance < 0.001:
+			continue
+		if forward.dot(relative / distance) < 0.22:
+			continue
+		best = node
+		best_distance = distance
+	return best
+
+func _register_wood_drops(drops: Array) -> void:
+	for item in drops:
+		if item is Node3D:
+			resource_nodes.append(item as Node3D)
+
 func _collect_resource() -> void:
 	var target := _nearest_resource()
 	if target == null:
 		return
-	if String(target.get_meta("resource_type")) == "wood":
-		wood += 1
+	if String(target.get_meta("resource_type")) == "wood_drop":
+		wood += int(target.get_meta("wood_amount", 1))
 	else:
 		stone += 1
 	resource_nodes.erase(target)
 	target.queue_free()
 	_update_hud()
+
+func _advance_axe_impact(delta: float) -> void:
+	if pending_chop_target == null:
+		return
+	pending_chop_timer -= delta
+	if pending_chop_timer > 0.0:
+		return
+	var target := pending_chop_target
+	pending_chop_target = null
+	if not is_instance_valid(target) or target.is_queued_for_deletion():
+		return
+	if player.global_position.distance_to(target.global_position) > CHOP_RANGE + 0.4:
+		return
+	if target.take_axe_hit(player.global_position) and target.is_falling:
+		resource_nodes.erase(target)
+
 
 func _make_player() -> void:
 	player = CharacterBody3D.new()
@@ -593,6 +653,8 @@ func _start_attack() -> void:
 	current_animation_state = "Attack"
 	animator.speed_scale = ATTACK_PLAYBACK_SPEED
 	animator.play(attack_clip, 0.05)
+	pending_chop_target = _nearest_choppable_tree()
+	pending_chop_timer = CHOP_IMPACT_DELAY if pending_chop_target != null else 0.0
 
 
 func _character_candidates() -> Array[String]:
@@ -781,6 +843,34 @@ func _measure_model_bounds(model: Node3D) -> AABB:
 	return bounds
 
 
+func _make_axe() -> void:
+	# Mixamo el kemigine bagla; iskelet yoksa gorunur yedek elde tasi.
+	var mount: Node3D = visuals
+	if skeleton != null:
+		var hand_bone := ""
+		for bone_index in range(skeleton.get_bone_count()):
+			var possible_name := String(skeleton.get_bone_name(bone_index))
+			var compact_name := possible_name.to_lower().replace("_", "").replace(":", "")
+			if compact_name.ends_with("righthand"):
+				hand_bone = possible_name
+				break
+		if not hand_bone.is_empty():
+			var attachment := BoneAttachment3D.new()
+			attachment.name = "AxeRightHand"
+			attachment.bone_name = hand_bone
+			skeleton.add_child(attachment)
+			mount = attachment
+	var axe := AXE_SCRIPT.new()
+	axe.name = "StarterAxe"
+	mount.add_child(axe)
+	if mount == visuals:
+		axe.position = Vector3(0.42, 1.17, -0.2)
+		axe.rotation_degrees = Vector3(0, -12, -24)
+	else:
+		axe.position = Vector3(0, -0.13, 0.06)
+		axe.rotation_degrees = Vector3(87, 0, -12)
+
+
 func _make_camera() -> void:
 	camera_pivot = Node3D.new()
 	camera_pivot.name = "CameraPivot"
@@ -845,5 +935,6 @@ func _physics_process(delta: float) -> void:
 	if direction.length_squared() > 0.01:
 		visuals.rotation.y = lerp_angle(visuals.rotation.y, atan2(direction.x, direction.z) + deg_to_rad(character_facing_offset), delta * 10.0)
 	_update_character_animation(delta, input.length_squared() > 0.01, sprint)
+	_advance_axe_impact(delta)
 	camera_pivot.global_position = camera_pivot.global_position.lerp(player.global_position + Vector3(0, 1.5, 0), minf(delta * 8.0, 1.0))
 	_update_hud()

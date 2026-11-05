@@ -121,3 +121,14 @@ Zemin **tek bir 160 metreye gerilmiş resim değildir**; 4m tekrar ile bütün y
 Oyun basladiginda `scripts/stylized_asset_preview.gd` Godot'ta mat/az-poly stilinde bir mese ve fasetli bir kaya olusturur. Ornek sahne `ArtDirectionShowcase`, oyuncunun onunde (-4.5, -8.5) ve (4.5, -8.5) konumundadir. 24 adet Meshy agaci hala eskisi gibi yuklenir. Etiketler sanat karsilastirmasi icindir; ornekler odun/tas toplama kaynaklarina dahil edilmedi, asil oyun odun/tas toplama akisi degismedi.
 
 Dusuk geometri, siluet ve ayni renk paleti hedeflendi. Bu modeller Godot kodundan uretilmis hizli stil prototipleridir, Meshy GLB modelleri degildir. `tests/stylized_preview_diagnostics.gd` tarafindan sahne/mesh/carpisma dogrulanir.
+
+## Balta, agac kesme, devrilme ve odun parcalari (Kasım 2026)
+
+- `SOL TIK`: Mevcut Char1 saldiri animasyonu ile stilize balta hareketi. Karakterin sag el kemigine dusuk polygonlu balta baglandi; iskelet yoksa sabit elde yedek.
+- Agaca yakin ve ona dogru bakarken her saldiri 0.23 saniye sonra baltanin darbesini uygular (3.4m yakinlik); spam korumasi mevcut saldiri suresinde.
+- Her 3 darbede once govdede acik renk kesik izi, kucuk odun kiymiklari, sallanma; son darbede agac 0.95 saniyede yana devrilir.
+- Govde yere dogru doner, orijinal FBX mesh'i gecici olarak animasyonda korunur; ardindan sahneden cikar, kucuk bir kutuk kalir ve 3 odun parcasi uretilir.
+- Yerdeki odun parcalarini `E` ile tek tek topla; agaca `E` basip aninda yok etmek artik mumkun degil. Tas toplama `E` ile eskisi gibi suruyor.
+- Test alani `ArtDirectionShowcase/StylizedOak` modeli de kesilebilir; diger 24 Meshy agaci ayni sistemi kullanir.
+- Kontrol dosyalari: `scripts/choppable_tree.gd`, `scripts/stylized_axe.gd`, `tests/chopping_diagnostics.gd`.
+- Bu, fizik tabanli runtime kirilma degil, kontrollu hafif yikim ve odun ganimeti yaklasimidir.

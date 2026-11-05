@@ -14,6 +14,7 @@ const STONE := Color("#777b76")
 const STONE_LIGHT := Color("#93978b")
 const STONE_DARK := Color("#59645f")
 const MOSS := Color("#526b3f")
+const CHOPPABLE_TREE_SCRIPT := preload("res://scripts/choppable_tree.gd")
 
 func _ready() -> void:
 	var oak := _create_tree()
@@ -57,7 +58,9 @@ func _cylinder(parent: Node3D, from_point: Vector3, to_point: Vector3, bottom: f
 	return part
 
 func _create_tree() -> Node3D:
-	var tree := Node3D.new()
+	var tree := CHOPPABLE_TREE_SCRIPT.new()
+	tree.set_meta("resource_type", "wood")
+	tree.set_meta("tree_species", "StylizedOak")
 	tree.name = "StylizedOak"
 	_cylinder(tree, Vector3(0, 0, 0), Vector3(0.12, 4.8, 0.05), 0.56, 0.30, BARK, "Trunk")
 	_cylinder(tree, Vector3(0, 0.06, 0), Vector3(0, 0.72, 0), 0.73, 0.49, BARK_LIGHT, "RootFlare")
