@@ -26,9 +26,8 @@ func _run() -> void:
 				var mesh_node: MeshInstance3D = current as MeshInstance3D
 				if mesh_node.mesh != null:
 					mesh_count += 1
-					for index in range(mesh_node.mesh.get_surface_count()):
-						var vertex_count: int = mesh_node.mesh.surface_get_array_len(index)
-						total_triangles += int(vertex_count / 3)
+					var face_vertices: PackedVector3Array = mesh_node.mesh.get_faces()
+					total_triangles += int(face_vertices.size() / 3)
 			for child in current.get_children():
 				children.append(child)
 		geometries.append(total_triangles)
