@@ -116,4 +116,4 @@ jobs:
             echo "Dedicated axe animation validation reported errors"
             exit 1
           fi
-          grep -F "AshvaleAxeSwingTest failures=0" godot-axe-animation.log
+          grep -E "AshvaleAxeSwingTest .*failures=0" godot-axe-animation.log
