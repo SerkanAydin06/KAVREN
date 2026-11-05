@@ -173,6 +173,7 @@ func _add_stump() -> void:
 	body.name = "StumpBody"
 	stump.add_child(body)
 	var collision := CollisionShape3D.new()
+	collision.name = "CollisionShape3D"
 	var shape := CylinderShape3D.new()
 	shape.height = 0.58
 	shape.radius = 0.45
