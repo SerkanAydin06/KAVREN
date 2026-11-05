@@ -28,13 +28,13 @@ func _run() -> void:
 			continue
 		track_count += 1
 		var full_name := String(clip.track_get_path(track).get_concatenated_subnames()).to_lower()
-		if full_name.contains("rightarm") or full_name.contains("rightforearm") or full_name.contains("spine"):
+		if full_name.contains("rightarm") or full_name.contains("rightforearm") or full_name.contains("rightshoulder") or full_name.contains("spine"):
 			var a: Quaternion = clip.rotation_track_interpolate(track, 0.0)
 			var b: Quaternion = clip.rotation_track_interpolate(track, 0.51)
 			var c: Quaternion = clip.rotation_track_interpolate(track, 0.75)
-			if absf(a.dot(b)) < 0.98 and absf(b.dot(c)) < 0.97:
+			if absf(a.dot(b)) < 0.994 and absf(b.dot(c)) < 0.994:
 				active_tracks += 1
-	if track_count < 40 or active_tracks < 3:
+	if track_count < 40 or active_tracks < 4:
 		failures += 1
 	var clip_duration: float = clip.length / game.ATTACK_PLAYBACK_SPEED
 	var impact_seconds: float = game.AXE_CHOP_ANIMATION.IMPACT_TIME / game.ATTACK_PLAYBACK_SPEED
