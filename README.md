@@ -115,3 +115,9 @@ Zemin **tek bir 160 metreye gerilmiş resim değildir**; 4m tekrar ile bütün y
 - FBX yoksa gecici basit agac fallback'i olur; CI modeli bulamadiginda basarisiz sayar.
 - `tests/tree_diagnostics.gd` Godot headless importu, dort turun geometrisi, sahne ornekleri, carpisma ve kaplama varligini kontrol eder. Ayrintili ucgen sayilari test logunda gosterilir.
 - FBX'ler agir cikar ve orman binlerce agaca buyutulurse LOD veya MultiMesh kullanilmali. Bu 24 agaclik prototip icin baslangic entegrasyonudur.
+
+## Stylized Fantasy Survival gorunus denemesi (Kasım 2026)
+
+Oyun basladiginda `scripts/stylized_asset_preview.gd` Godot'ta mat/az-poly stilinde bir mese ve fasetli bir kaya olusturur. Ornek sahne `ArtDirectionShowcase`, oyuncunun onunde (-4.5, -8.5) ve (4.5, -8.5) konumundadir. 24 adet Meshy agaci hala eskisi gibi yuklenir. Etiketler sanat karsilastirmasi icindir; ornekler odun/tas toplama kaynaklarina dahil edilmedi, asil oyun odun/tas toplama akisi degismedi.
+
+Dusuk geometri, siluet ve ayni renk paleti hedeflendi. Bu modeller Godot kodundan uretilmis hizli stil prototipleridir, Meshy GLB modelleri degildir. `tests/stylized_preview_diagnostics.gd` tarafindan sahne/mesh/carpisma dogrulanir.

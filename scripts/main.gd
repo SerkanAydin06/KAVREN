@@ -29,6 +29,7 @@ const GROUND_ALBEDO := preload("res://assets/ground/ashvale_soil_grass_1024.webp
 const GROUND_SHADER := preload("res://assets/ground/ashvale_ground.gdshader")
 const GROUND_SIZE := 160.0
 const GROUND_TILE_METERS := 4.0
+const STYLIZED_PREVIEW_SCENE := preload("res://scripts/stylized_asset_preview.gd")
 const ATTACK_PLAYBACK_SPEED := 3.0 # 2.27 sn'lik FBX hareketi ~0.76 sn'de oynat.
 # Tekrarlanan FBX sahneleri paylasilan Mesh/Texture kaynaklarini kullanir.
 const TREE_MODEL_PATHS := [
@@ -81,6 +82,7 @@ func _ready() -> void:
 	_make_player()
 	_make_camera()
 	_make_camp()
+	_make_stylized_preview()
 	_make_hud()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -122,6 +124,14 @@ func _make_world() -> void:
 	collider.position.y = -0.2
 	ground.add_child(collider)
 	print("Ashvale ground: ", GROUND_SIZE, "m | ", GROUND_ALBEDO.get_width(), "px | tile ", GROUND_TILE_METERS, "m")
+
+func _make_stylized_preview() -> void:
+	# Prototip karsilastirmasi: mevcut Meshy agaclari degistirmeden yakina iki ornek ekle.
+	var preview := STYLIZED_PREVIEW_SCENE.new()
+	preview.name = "ArtDirectionShowcase"
+	add_child(preview)
+	print("Ashvale style preview: stylized tree + rock added")
+
 
 func _add_primitive(parent: Node3D, shape_mesh: Mesh, pos: Vector3, tint: Color) -> MeshInstance3D:
 	var item := MeshInstance3D.new()

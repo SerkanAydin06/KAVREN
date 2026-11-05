@@ -88,3 +88,11 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - Agac kesme/toplama `resource_type=wood` sistemi ve silindir govde carpisma korunuyor. Eksik FBX icin basit primitive fallback var ama CI hatayi bildiriyor.
 - Otomatik Godot test: `tests/tree_diagnostics.gd` ile import, geometri, 4 tur, kaynak ve carpisma testleri.
 - Performans ve UV/alpha (yaprak) gorunumu, Godot'ta 3D ekran goruntusunden de incelenmeli; FBX polygon sayilarini CI logu raporlayacak.
+
+## 2026-11-05 — Dusuk-poly stil denemesi
+- Sanat hedefi: Stylized Fantasy Survival, orta/dusuk polygon, mat boyali yuzey, okunakli siluet, agac parcalanmasi icin kontrollu parcalar.
+- Meshy CLI kurulumunun bu ortamda tamamlanamamasi nedeniyle ucretli Meshy gorevi baslatilmadi. Bunun yerine `scripts/stylized_asset_preview.gd` sahnede kendi geometrisini yaratan Godot stil karsilastirmasi oldu.
+- `scripts/main.gd` onceki 24 Mesy agacini koruyarak oyuncunun onune `ArtDirectionShowcase` icerisinde bir STILIZE MESE ve STILIZE KAYA ornegi yerlestiriyor.
+- Konumlar (-4.5,0,-8.5) ve (4.5,0,-8.5); etiket, basit carpisma, mat renk paleti var.
+- `tests/stylized_preview_diagnostics.gd` geometri, uclu boyut butcesi, iki collider ve 24 eski agacin durumu icin CI testi.
+- Bu stil denemesi Meshy uretimi degil ve yakin incelemede son sanat eseri sayilmaz. Uygun bulunursa asil FBX/GLB assetleri ayni tasarim kurallariyla uretilecek.

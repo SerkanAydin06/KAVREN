@@ -71,3 +71,14 @@ jobs:
             exit 1
           fi
           grep -F "AshvaleTreeTest failures=0" godot-forest.log
+
+      - name: Validate stylized tree and rock art direction preview
+        shell: bash
+        run: |
+          set -o pipefail
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/stylized_preview_diagnostics.gd 2>&1 | tee godot-style.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-style.log; then
+            echo "Stylized showcase validation reported errors"
+            exit 1
+          fi
+          grep -F "AshvaleStyleTest preview=true" godot-style.log
