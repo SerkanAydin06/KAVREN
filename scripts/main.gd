@@ -82,6 +82,8 @@ var stamina := 100.0
 var camera_distance := 5.0
 var pending_chop_target: Node3D = null
 var pending_chop_timer := 0.0
+var equipped_axe: Node3D
+var axe_attachment: Node3D
 
 func _ready() -> void:
 	_make_world()
@@ -844,13 +846,14 @@ func _measure_model_bounds(model: Node3D) -> AABB:
 
 
 func _make_axe() -> void:
-	# Mixamo el kemigine bagla; iskelet yoksa gorunur yedek elde tasi.
+	# Char1 FBX mesh'i oyun boyuna normalize ediliyor. Ayni olcek el kemigine
+	# eklenen ekipmana da uygulanir; karsilastirma yapmadan balta ~1 cm kalir.
 	var mount: Node3D = visuals
+	var hand_bone := ""
 	if skeleton != null:
-		var hand_bone := ""
 		for bone_index in range(skeleton.get_bone_count()):
 			var possible_name := String(skeleton.get_bone_name(bone_index))
-			var compact_name := possible_name.to_lower().replace("_", "").replace(":", "")
+			var compact_name := possible_name.to_lower().replace("_", "").replace(":", "").replace(".", "").replace("-", "").replace(" ", "")
 			if compact_name.ends_with("righthand"):
 				hand_bone = possible_name
 				break
@@ -863,12 +866,21 @@ func _make_axe() -> void:
 	var axe := AXE_SCRIPT.new()
 	axe.name = "StarterAxe"
 	mount.add_child(axe)
-	if mount == visuals:
-		axe.position = Vector3(0.42, 1.17, -0.2)
-		axe.rotation_degrees = Vector3(0, -12, -24)
-	else:
-		axe.position = Vector3(0, -0.13, 0.06)
+	equipped_axe = axe
+	axe_attachment = mount
+	# Mount her rigde farkli unit-scale tasiyabilir (cm -> metre). Balta
+	# uzunlugu dunya koordinatlarinda ~0.8 m kalmali ve el ile hareket etmeli.
+	var mount_scale := mount.global_transform.basis.get_scale()
+	var inherited_scale := maxf((mount_scale.x + mount_scale.y + mount_scale.z) / 3.0, 0.0001)
+	var unit_correction := 1.0 / inherited_scale
+	axe.scale = Vector3.ONE * unit_correction
+	if mount is BoneAttachment3D:
+		axe.position = Vector3(0.02, -0.12, 0.05) * unit_correction
 		axe.rotation_degrees = Vector3(87, 0, -12)
+	else:
+		axe.position = Vector3(0.43, 1.15, -0.20) * unit_correction
+		axe.rotation_degrees = Vector3(0, -12, -24)
+	print("Ashvale equipped axe: mount=", hand_bone if not hand_bone.is_empty() else "fallback", " inherited_scale=", inherited_scale, " world_scale=", axe.global_transform.basis.get_scale())
 
 
 func _make_camera() -> void:

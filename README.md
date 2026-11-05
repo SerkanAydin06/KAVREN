@@ -132,3 +132,7 @@ Dusuk geometri, siluet ve ayni renk paleti hedeflendi. Bu modeller Godot kodunda
 - Test alani `ArtDirectionShowcase/StylizedOak` modeli de kesilebilir; diger 24 Meshy agaci ayni sistemi kullanir.
 - Kontrol dosyalari: `scripts/choppable_tree.gd`, `scripts/stylized_axe.gd`, `tests/chopping_diagnostics.gd`.
 - Bu, fizik tabanli runtime kirilma degil, kontrollu hafif yikim ve odun ganimeti yaklasimidir.
+
+## Görünür balta düzeltmesi (2026-11-05)
+
+Char1 FBX iskelet/modeli genellikle santimetre ölçeğiyle geliyor. Oyuncu modelini 1,8 metreye küçültürken sağ el kemiğine eklenen ilk balta da aynı küçültmeye uğruyordu. Balta mesh'i artık parent node'un global ölçeğiyle **ters orantılı** ayarlanıyor; böylece gerçek boyutu yaklaşık 0,8 metre kalıyor. Yerel pozisyon ofseti de aynı şekilde dönüştürülüyor. `AxeRightHand` iskelet kemiği takip ediliyor, model görünür ve daha okunaklı kama biçimli bir balta başlığı kullanıyor. `tests/weapon_equipment_diagnostics.gd` el bağlantısı, dünya ölçeği, parça sayısı ve mesafe için otomatik test içeriyor.

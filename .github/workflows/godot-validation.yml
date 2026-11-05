@@ -94,3 +94,15 @@ jobs:
             exit 1
           fi
           grep -F "AshvaleChopTest hits=3 fall=true drops=3 stump=true preview_tree=true failures=0" godot-chopping.log
+
+      - name: Verify axe is visibly scaled and equipped to hand
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 100s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/weapon_equipment_diagnostics.gd 2>&1 | tee godot-weapon.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-weapon.log; then
+            echo "Equipped axe validation reported errors"
+            exit 1
+          fi
+          grep -F "AshvaleWeaponTest bone=" godot-weapon.log
+          grep -F "failures=0" godot-weapon.log

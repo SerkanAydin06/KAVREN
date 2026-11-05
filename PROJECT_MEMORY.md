@@ -103,3 +103,10 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - `scripts/stylized_axe.gd` basit stilize balta modeli; Mixamo sag el kemigine BoneAttachment3D ile baglanir.
 - `resource_type=wood` artik aninda E ile toplanmaz. `resource_type=wood_drop` E ile odun, stone E ile tas olarak toplanir.
 - 24 Meshy FBX ve yakin demo stylized oak kesilebilir. `tests/chopping_diagnostics.gd` ile uc darbe, cooldown, kütük, loot ve E testi CI'a eklendi.
+
+## 2026-11-05 — Balta görünmüyor sorunu
+- Kullanıcı baltanın oyunda görünmediğini, karakterin yumruk attığını bildirdi.
+- Char1 için `_make_player` içinde `character.scale` boy düzeltmesi uygulanıyor. Sağ el kemiğine bağlı baltanın bu scale'i devralması çok küçük görünmesine neden oluyordu.
+- `scripts/main.gd` `_make_axe`: Mount dünya ölçeğini ölçüyor; balta ve el kavrama pozisyonunun local ölçeği ters çarpanla düzeltiliyor. `equipped_axe`/`axe_attachment` referansları tanımlı.
+- `scripts/stylized_axe.gd` netleştirilmiş metal balta başlığı, kesici kenar ve sap tutamakları içeriyor.
+- `tests/weapon_equipment_diagnostics.gd`: Char1 sağ el kemiği, gerçek dünya ölçeği, geometri, montaj mesafesi kontrolü. CI'a eklendi. Gerçek Windows görsel kontrolü halen ayrıca gerekir.
