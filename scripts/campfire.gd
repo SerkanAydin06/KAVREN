@@ -48,7 +48,6 @@ func _process(delta: float) -> void:
 	_time += delta
 	var n := _flicker.get_noise_1d(_time * 10.0)
 	light.light_energy = 2.6 + n * 0.9
-	light.position = Vector3(n * 0.05, 0.75 + n * 0.04, _flicker.get_noise_1d(_time * 7.0 + 30.0) * 0.05)
 
 func _material(color: Color, roughness := 0.9) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()

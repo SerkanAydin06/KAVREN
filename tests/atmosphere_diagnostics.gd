@@ -21,7 +21,7 @@ func _run() -> void:
 		return
 	atmosphere.time_flows = false
 	var env: Environment = atmosphere.environment
-	if env.background_mode != Environment.BG_SKY or not env.sdfgi_enabled or not env.ssao_enabled or not env.volumetric_fog_enabled or env.tonemap_mode != Environment.TONE_MAPPER_AGX:
+	if env.background_mode != Environment.BG_SKY or not env.fog_enabled or env.sdfgi_enabled or env.ssil_enabled or env.ssao_enabled or env.volumetric_fog_enabled or env.tonemap_mode != Environment.TONE_MAPPER_AGX:
 		failures += 1
 	var heights := {}
 	for hour in [0.0, 6.0, 12.5, 19.0, 23.0]:

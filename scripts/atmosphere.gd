@@ -104,6 +104,7 @@ var _cloud_offset := Vector2.ZERO
 var _cloud_target := 0.45
 var cloud_coverage := 0.45
 var _cloud_timer := 0.0
+var _lighting_elapsed := 0.0
 var _weather_random := RandomNumberGenerator.new()
 
 func _ready() -> void:
@@ -133,7 +134,7 @@ func _build() -> void:
 
 	var sky := Sky.new()
 	sky.sky_material = sky_material
-	sky.radiance_size = Sky.RADIANCE_SIZE_256
+	sky.radiance_size = Sky.RADIANCE_SIZE_128
 	sky.process_mode = Sky.PROCESS_MODE_INCREMENTAL
 
 	environment = Environment.new()
@@ -146,23 +147,10 @@ func _build() -> void:
 	environment.tonemap_mode = Environment.TONE_MAPPER_AGX
 	environment.tonemap_exposure = 1.0
 	environment.tonemap_white = 6.0
-	# Temas golgeleri ve dolayli isik.
-	environment.ssao_enabled = true
-	environment.ssao_radius = 1.4
-	environment.ssao_intensity = 1.8
-	environment.ssao_power = 1.6
-	environment.ssao_detail = 0.6
-	environment.ssao_light_affect = 0.15
-	environment.ssil_enabled = true
-	environment.ssil_radius = 4.0
-	environment.ssil_intensity = 0.7
-	environment.sdfgi_enabled = true
-	environment.sdfgi_use_occlusion = true
-	environment.sdfgi_cascades = 4
-	environment.sdfgi_min_cell_size = 0.25
-	environment.sdfgi_y_scale = Environment.SDFGI_Y_SCALE_75_PERCENT
-	environment.sdfgi_energy = 0.9
-	environment.sdfgi_bounce_feedback = 0.45
+	# Sky ambient light and distance fog keep the day/night palette at lower GPU cost.
+	environment.ssao_enabled = false
+	environment.ssil_enabled = false
+	environment.sdfgi_enabled = false
 	# Parlama: ates ve gunes cevresi.
 	environment.glow_enabled = true
 	environment.glow_intensity = 0.55
@@ -170,20 +158,14 @@ func _build() -> void:
 	environment.glow_bloom = 0.04
 	environment.glow_hdr_threshold = 1.15
 	environment.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
-	# Mesafe sisi (hava perspektifi) + hacimsel sis (isik huzmeleri).
+	# Mesafe sisi ve hava perspektifi.
 	environment.fog_enabled = true
 	environment.fog_mode = Environment.FOG_MODE_EXPONENTIAL
 	environment.fog_density = 0.0035
 	environment.fog_aerial_perspective = 0.55
 	environment.fog_sky_affect = 0.25
 	environment.fog_sun_scatter = 0.25
-	environment.volumetric_fog_enabled = true
-	environment.volumetric_fog_density = 0.012
-	environment.volumetric_fog_albedo = Color(0.92, 0.94, 0.96)
-	environment.volumetric_fog_anisotropy = 0.55
-	environment.volumetric_fog_length = 80.0
-	environment.volumetric_fog_ambient_inject = 0.25
-	environment.volumetric_fog_sky_affect = 0.0
+	environment.volumetric_fog_enabled = false
 	# Hafif renk ayari.
 	environment.adjustment_enabled = true
 	environment.adjustment_saturation = 1.08
@@ -197,14 +179,13 @@ func _build() -> void:
 	sun = DirectionalLight3D.new()
 	sun.name = "Sun"
 	sun.shadow_enabled = true
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	sun.directional_shadow_max_distance = 110.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	sun.directional_shadow_max_distance = 55.0
 	sun.directional_shadow_blend_splits = true
 	sun.shadow_blur = 1.2
-	sun.light_angular_distance = 0.6 # yumusak (PCSS) golge kenari
+	sun.light_angular_distance = 0.0
 	sun.shadow_bias = 0.03
 	sun.shadow_normal_bias = 1.2
-	sun.light_volumetric_fog_energy = 1.4
 	sun.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
 	add_child(sun)
 
@@ -212,9 +193,9 @@ func _build() -> void:
 	moon.name = "Moon"
 	moon.light_color = Color(0.62, 0.72, 1.0)
 	moon.shadow_enabled = true
+	moon.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	moon.directional_shadow_max_distance = 60.0
 	moon.shadow_blur = 2.0
-	moon.light_volumetric_fog_energy = 0.6
 	moon.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
 	add_child(moon)
 
@@ -224,8 +205,11 @@ func _process(delta: float) -> void:
 		hour = fposmod(hour + delta * 24.0 / (day_length_minutes * 60.0), 24.0)
 		if int(previous) != int(hour):
 			hour_changed.emit(hour)
-	_update_weather(delta)
-	apply_time()
+	_lighting_elapsed += delta
+	if _lighting_elapsed >= 0.1:
+		_update_weather(_lighting_elapsed)
+		apply_time()
+		_lighting_elapsed = 0.0
 
 func advance_hours(amount: float) -> void:
 	hour = fposmod(hour + amount, 24.0)
@@ -298,6 +282,4 @@ func apply_time() -> void:
 	environment.fog_light_energy = lerpf(0.4, 1.0, day)
 	# Sabah sisi: 5-9 arasi yogun, ogleye dogru acilir.
 	var morning_mist := smoothstep(4.0, 6.0, hour) * (1.0 - smoothstep(7.0, 9.5, hour))
-	environment.volumetric_fog_density = lerpf(0.004, 0.011, morning_mist) + 0.004 * (1.0 - day)
 	environment.fog_density = lerpf(0.0016, 0.003, morning_mist)
-	environment.volumetric_fog_albedo = Color(0.92, 0.94, 0.96).lerp(Color(1.0, 0.85, 0.72), sunset * 0.5)
