@@ -11,6 +11,7 @@ var ally_essence := 0
 var enemy_essence := 0
 var ally_charge := 0
 var enemy_charge := 0
+var critical_notice := ""
 const SHEET := preload("res://scripts/creatures/creature_sheet.gd")
 var learned := [[],[],[]]
 var technique_turn := [1,1]
@@ -436,6 +437,7 @@ func _begin_training(index: int) -> void:
 	enemy_essence = enemy_profile.essence
 	ally_charge = 0
 	enemy_charge = 0
+	critical_notice = ""
 	turn_count = 0
 	note = "Rakip mevzi aldı. Hamleni seç."
 
@@ -571,12 +573,13 @@ func _battle_action(guard: bool, special := false, path := -1) -> void:
 		return
 	ally_essence -= cost
 	if path >= 0:
-		technique_turn[path] = turn_count+4
+		technique_turn[path] = turn_count+1+4
 	resolving = true
 	var target := battle
 	var ally: Node3D = creatures[active_species]
 	var rival := wild_actor
 	turn_count += 1
+	critical_notice = ""
 	var heavy := turn_count % 3 == 0
 	var hp_limit := int(ally_profile.hp)
 	var known: Array = learned[active_species]
@@ -603,6 +606,8 @@ func _battle_action(guard: bool, special := false, path := -1) -> void:
 		if heavy:
 			hit += int(skill.get("counter",0))
 		ally_charge += int(ally_profile.finesse)
+		if ally_charge >= 100:
+			critical_notice = "Kritik vuruş!"
 		hit = STATS.mitigate(STATS.critical(hit,ally_charge),enemy_profile)
 		ally_charge %= 100
 		friend_energy = mini(hp_limit,friend_energy+roundi(mini(hit,rival_energy)*float(skill.get("drain",0))))
@@ -618,6 +623,8 @@ func _battle_action(guard: bool, special := false, path := -1) -> void:
 	await _strike(rival,ally,enemy_special)
 	var incoming := STATS.strike_damage(enemy_profile,target,active_species,5 if enemy_special else 0)
 	enemy_charge += int(enemy_profile.finesse)
+	if enemy_charge >= 100:
+		critical_notice += " Rakip kritik vurdu!"
 	incoming = STATS.critical(incoming,enemy_charge)
 	enemy_charge %= 100
 	if heavy:
@@ -798,6 +805,7 @@ func _refresh_interface() -> void:
 					status = "öz yetersiz"
 				combat_text.text += "   [%d] %s (%s)" % [4+path,skill.name,status]
 		combat_text.text += "\nÖz %d/%d   ·   Kritik %d/100   ·   Rakip özü %d   ·   [2] +4 öz   ·   [3] 4 öz   ·   [4–5] 6 öz" % [ally_essence,ally_profile.essence,ally_charge,enemy_essence]
+		combat_text.text += "   "+critical_notice
 
 	else:
 		prompt.text = ""
@@ -842,7 +850,7 @@ func _load_progress() -> void:
 		return
 	progress_writable = false
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(STATE_PATH))
-	if not data is Dictionary or data.get("version") not in [1,2,3]:
+	if not data is Dictionary or not _number(data.get("version")) or data.version != int(data.version) or int(data.version) not in [1,2,3]:
 		note = "Kayıt okunamadı. Önceki kayıt korunuyor."
 		return
 	for key in ["levels","xp","tired","position"]:
@@ -880,7 +888,7 @@ func _load_progress() -> void:
 		for i in range(3):
 			if not STATS.valid(int(data.levels[i]),allocations[i]):
 				return
-			if not data.roster.has(i) and not data.roster.has(float(i)) and allocations[i] != STATS.UNTUNED:
+			if not data.roster.has(i) and not data.roster.has(float(i)) and STATS.remaining(int(data.levels[i]),allocations[i]) != 2*int(data.levels[i]):
 				return
 		for i in range(3):
 			for stat in range(STATS.NAMES.size()):
