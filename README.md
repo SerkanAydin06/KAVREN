@@ -6,7 +6,7 @@ Kodla oluşturulan çizgi film dünyasında yaratıklarla dostluk kurma, gelişm
 
 Filizik'in yanına gel ve E ile iki meyve sun. Meyveleri başlangıçtaki yeşil çalılardan E ile toplayabilirsin. Yoldaşınla Damlup veya Çakılcık'a yaklaş ve E ile dostça antrenman başlat. 1 yetenek, 2 toparlanma, Esc ayrılma. Antrenman deneyim kazandırır. Dinlenen yaratığa E ile yaklaşarak onu da ekibine alabilirsin.
 
-Seviye 2 Filizik ile vadinin sarmaşık geçidine gel. F ile geçidi aç ve yeni çiçekli açıklığa ulaş. Tab aktif yoldaşı değiştirir. Kazanılan seviye, dostluk, ekip ve keşif ilerlemesi ayrı bir otomatik kayıt dosyasına yazılır.
+Seviye 2 Filizik ile vadinin sarmaşık geçidine gel. F ile geçidi aç ve yeni çiçekli açıklığa ulaş. Tab aktif yoldaşı değiştirir. R yakındaki başka bir yaratıkla yeniden dostça antrenman başlatır. Kazanılan seviye, dostluk, ekip ve keşif ilerlemesi ayrı bir otomatik kayıt dosyasına yazılır.
 
 WASD hareket, fare kamera, Shift koşu, Space zıplama. F11 ekran modu.
 

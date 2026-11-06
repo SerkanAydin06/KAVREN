@@ -26,6 +26,13 @@ func _run() -> void:
 	game.player.position = Vector3(0,game.height_at(0,-33),-30)
 	if not game._open_path():
 		failures += 1
+	game.active_species = 0
+	# A recruited partner can still train; switching partners cannot consume all encounters.
+	game._begin_training(1)
+	for turn in range(6):
+		game._battle_action(false)
+	if game.battle!=-1 or game.experience[game.active_species]<=0:
+		failures += 1
 	game._checkpoint_creatures()
 	var restored: Node = load("res://creature_valley.tscn").instantiate()
 	root.add_child(restored)

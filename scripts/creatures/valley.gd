@@ -225,11 +225,7 @@ func _interact() -> void:
 		elif roster.is_empty():
 			note = "Önce Filizik ile arkadaş ol."
 		else:
-			battle = near
-			friend_energy = 30+levels[active_species]*5
-			rival_energy = 24+near*4
-			turn_count = 0
-			note = "Dostça antrenman başladı. 1 hareket · 2 toparlan · Esc ayrıl"
+			_begin_training(near)
 		_checkpoint_creatures()
 		return
 	for shrub in bushes:
@@ -242,6 +238,32 @@ func _interact() -> void:
 				note = "Meyve kesen dolu."
 			return
 	note = "Kulaklı dostlara yaklaş · E tanış · Tab yoldaş değiştir"
+
+func _begin_training(index: int) -> void:
+	if index == active_species or roster.is_empty():
+		return
+	battle = index
+	friend_energy = 30+levels[active_species]*5
+	rival_energy = 24+index*4
+	turn_count = 0
+	note = "Dostça antrenman başladı. 1 hareket · 2 toparlan · Esc ayrıl"
+
+func _spar_again() -> void:
+	if roster.is_empty() or battle >= 0:
+		return
+	var target := -1
+	var distance := 4.0
+	for i in range(3):
+		if i == active_species:
+			continue
+		var gap := player.position.distance_to(creatures[i].position)
+		if gap < distance:
+			distance = gap
+			target = i
+	if target >= 0:
+		_begin_training(target)
+	else:
+		note = "Antrenman için başka bir yaratığa yaklaş."
 
 func _bond(index: int) -> void:
 	if roster.has(index):
@@ -271,7 +293,7 @@ func _battle_action(recover: bool) -> void:
 		# The starter shares field experience, even when another partner is active.
 		if active_species != 0 and roster.has(0) and levels[0]<2:
 			levels[0] = 2
-		while experience[active_species] >= levels[active_species]*10:
+		while levels[active_species]<99 and experience[active_species] >= levels[active_species]*10:
 			experience[active_species] -= levels[active_species]*10
 			levels[active_species] += 1
 		note = "Antrenman tamam! "+COMPANION.SPECIES[active_species].name+" seviye "+str(levels[active_species])+". E ile yeni dostuna yaklaş."
@@ -308,6 +330,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_E:
 				if battle < 0:
 					_interact()
+			KEY_R:
+				_spar_again()
 			KEY_F:
 				if battle < 0:
 					_open_path()
@@ -363,6 +387,8 @@ func _physics_process(delta: float) -> void:
 	if not hit.is_empty():
 		camera.position = camera.position.normalized()*maxf(0.2,camera_pivot.position.distance_to(hit.position)-0.2)
 	for i in roster:
+		if i == battle:
+			continue
 		var creature: Node3D = creatures[i]
 		var slot := roster.find(i)
 		var follow := player.position+Basis(Vector3.UP,yaw)*Vector3(1.4+slot*0.9,0,1.9+slot*0.6)
@@ -390,7 +416,7 @@ func _refresh_interface() -> void:
 	var team := "Ekibin henüz boş"
 	if not roster.is_empty():
 		team = "Yoldaş · "+COMPANION.SPECIES[active_species].name+"  Sv."+str(levels[active_species])+"  Deneyim "+str(experience[active_species])+"/"+str(levels[active_species]*10)
-	panel.text = team+"\nMeyve "+str(berries)+"  ·  FPS "+str(Engine.get_frames_per_second())+"\nWASD hareket · Shift koş · Space zıpla · Tab yoldaş · E tanış · F yardım\n"+note
+	panel.text = team+"\nMeyve "+str(berries)+"  ·  FPS "+str(Engine.get_frames_per_second())+"\nWASD hareket · Shift koş · Space zıpla · Tab yoldaş · E tanış · R antrenman · F yardım\n"+note
 	if battle >= 0:
 		prompt.text = "ANTRENMAN · "+COMPANION.SPECIES[battle].name+"\nYoldaş enerjisi "+str(friend_energy)+"  ·  Rakip "+str(rival_energy)+"\n[1] "+COMPANION.SPECIES[active_species].move+"   [2] Toparlan   [Esc] Ayrıl"
 	else:
