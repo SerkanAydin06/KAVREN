@@ -5,8 +5,8 @@ uniform sampler2D ground_albedo : source_color, filter_linear_mipmap_anisotropic
 uniform float meters_per_tile = 4.0;
 uniform vec2 camp_center;
 uniform vec2 mine_entry;
-uniform vec4 meadow_dark : source_color = vec4(0.22, 0.48, 0.37, 1.0);
-uniform vec4 meadow_light : source_color = vec4(0.54, 0.75, 0.37, 1.0);
+uniform vec4 meadow_dark : source_color = vec4(0.32, 0.53, 0.39, 1.0);
+uniform vec4 meadow_light : source_color = vec4(0.58, 0.72, 0.41, 1.0);
 uniform vec4 dry_clay : source_color = vec4(0.88, 0.68, 0.43, 1.0);
 uniform vec4 trail_edge : source_color = vec4(0.61, 0.57, 0.33, 1.0);
 varying vec2 terrain_world_uv;
@@ -33,31 +33,21 @@ void vertex() {
 void fragment() {
     vec2 p = terrain_world_uv;
     float patch_value = smooth_noise(p * 0.24) * 0.65 + smooth_noise(p * 0.06) * 0.35;
-    float edge = max(fwidth(patch_value), 0.015);
-    float bands = smoothstep(0.40-edge, 0.40+edge, patch_value) * 0.45
-                + smoothstep(0.59-edge, 0.59+edge, patch_value) * 0.55;
-    vec3 grass = mix(meadow_dark.rgb, meadow_light.rgb, bands);
+    float meadow = smoothstep(0.20, 0.82, patch_value);
+    vec3 grass = mix(meadow_dark.rgb, meadow_light.rgb, meadow);
     float t = clamp((p.y - camp_center.y) / (mine_entry.y - camp_center.y), 0.0, 1.0);
     vec2 trail = mix(camp_center, mine_entry, t);
     trail.x += sin(t * 6.28318) * 3.0;
     float path_dist = length(p - trail) - 1.65;
     float clearing_dist = length((p - camp_center) * vec2(0.86, 1.0)) - 5.0;
     float bank = min(path_dist, clearing_dist) + (patch_value - 0.5) * 1.4;
-    float detail = texture(ground_albedo, p / meters_per_tile).g;
-    vec3 verge = mix(trail_edge.rgb, grass, smoothstep(0.05, 0.40, bank));
-    ALBEDO = mix(dry_clay.rgb, verge, smoothstep(-0.18, 0.05, bank)) * (0.96 + detail * 0.09);
-    // Small grouped grass strokes along the verge, fading into broad color at distance.
-    vec2 cell_uv = p * vec2(1.85, 2.4);
-    vec2 id = floor(cell_uv);
-    vec2 q = fract(cell_uv) - 0.5;
-    float seed = hash21(id);
-    float stem = abs(q.x + (q.y + 0.05) * 0.49) - (0.029 - q.y * 0.07);
-    float tip = abs(q.y + 0.025) - 0.175;
-    float mark = max(stem, tip);
-    float aa = max(0.009, length(fwidth(cell_uv)));
-    float grass_mark = (1.0 - smoothstep(-aa, aa, mark)) * step(0.66, seed);
-    float close_up = 1.0 - smoothstep(0.04, 0.15, aa);
-    ALBEDO *= 1.0 - 0.28 * close_up * grass_mark * smoothstep(0.4, 0.8, bank) * (1.0-smoothstep(5.0, 10.0, bank));
+    // Use broad changes of hue and a staggered second sample to hide the tile repeat.
+    vec2 uv = p / meters_per_tile;
+    float grain = mix(texture(ground_albedo, uv).g,
+                      texture(ground_albedo, vec2(-uv.y, uv.x) * 0.71 + vec2(0.28, 0.61)).g, meadow);
+    float verge = smoothstep(-0.35, 0.65, bank);
+    vec3 path = mix(dry_clay.rgb, trail_edge.rgb, smoothstep(-0.75, 0.08, bank) * 0.55);
+    ALBEDO = mix(path, grass, verge) * (0.975 + grain * 0.055);
     ROUGHNESS = 1.0;
     SPECULAR = 0.06;
 }

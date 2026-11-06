@@ -55,6 +55,12 @@ static func height_at(x: float, z: float) -> float:
 	var clearing := smoothstep(7.0,17.0,Vector2(x,z).length())
 	return (ridge+side)*clearing
 
+# The same world coordinate gets the same normal on both sides of a grid edge.
+static func _ground_normal(point: Vector2, spacing: float) -> Vector3:
+	var across := height_at(point.x - spacing, point.y) - height_at(point.x + spacing, point.y)
+	var along := height_at(point.x, point.y - spacing) - height_at(point.x, point.y + spacing)
+	return Vector3(across, 2.0 * spacing, along).normalized()
+
 func _make_valley() -> void:
 	atmosphere = ATMOSPHERE_SCRIPT.new()
 	add_child(atmosphere)
@@ -72,8 +78,8 @@ func _make_valley() -> void:
 			var c := a+Vector2(0,step_size)
 			var d := a+Vector2(step_size,step_size)
 			for q in [a,b,c,b,d,c]:
+				tool.set_normal(_ground_normal(q, step_size))
 				tool.add_vertex(Vector3(q.x,height_at(q.x,q.y),q.y))
-	tool.generate_normals()
 	tool.index()
 	var mesh := tool.commit()
 	var ground := StaticBody3D.new()
