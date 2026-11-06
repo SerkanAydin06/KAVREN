@@ -81,6 +81,7 @@ func _run() -> void:
 	game.attack_remaining = 0.0
 	game.pending_chop_target = null
 	game.player.velocity = Vector3.ZERO
+	failures += _test_sustained_sprint(game, anim)
 	# Kamp atesi: atesin icinde can azalir, sifirda olum.
 	game.player.global_position = game.CAMP_POSITION + Vector3(0.2, 0.1, 0)
 	game._update_health(0.5)
@@ -103,3 +104,73 @@ func _run() -> void:
 		failures += 1
 	print("AshvaleMoveTest jump_speed=", snappedf(game.JUMP_PLAYBACK_SPEED, 0.001), " takeoff_delay=", snappedf(game.JUMP_TAKEOFF_DELAY, 0.001), " crouch=", snappedf(crouch_depth, 0.001), " burned_hp=", snappedf(burned, 0.1), " walk_v=", snappedf(walked, 0.01), " swing_v=", swing_velocity, " failures=", failures)
 	quit(1 if failures > 0 else 0)
+
+func _test_sustained_sprint(game: Node, anim: AnimationPlayer) -> int:
+	var failures := 0
+	game.player.global_position = Vector3(160, 0.02, 160)
+	game.stamina = 100.0
+	for code in [KEY_W, KEY_SHIFT]:
+		_set_key(code, true)
+	var leg_names: Array[String] = ["leftupleg"]
+	var leg: int = game._find_bone_by_suffix(leg_names)
+	var previous_pose := Quaternion.IDENTITY
+	var leg_motion := 0.0
+	var wraps := 0
+	var previous := -1.0
+	for tick in range(180):
+		game._physics_process(1.0 / 60.0)
+		anim.advance(1.0 / 60.0)
+		if tick < 15:
+			continue
+		if anim.current_animation != game.run_clip or anim.speed_scale <= 0.0:
+			failures += 1
+			break
+		if leg >= 0:
+			var pose: Quaternion = game.skeleton.get_bone_pose_rotation(leg)
+			if previous >= 0:
+				leg_motion += previous_pose.angle_to(pose)
+			previous_pose = pose
+		var current := anim.current_animation_position
+		if is_equal_approx(current, previous):
+			failures += 1
+			break
+		if current < previous:
+			wraps += 1
+		previous = current
+	if wraps < 2 or leg_motion < 1.0:
+		failures += 1
+	game.stamina = 0.5
+	var recovery_changes := 0
+	var was_running := false
+	for tick in range(105):
+		game._physics_process(1.0 / 60.0)
+		anim.advance(1.0 / 60.0)
+		var running: bool = anim.current_animation == game.run_clip
+		if running != was_running:
+			recovery_changes += 1
+		if running and tick < 60:
+			failures += 1
+			break
+		was_running = running
+	if recovery_changes != 1 or not was_running:
+		failures += 1
+	game.player.position.y = 2.0
+	game._physics_process(1.0 / 60.0)
+	if game.player.is_on_floor() or anim.current_animation != game.run_clip:
+		failures += 1
+	for tick in range(6):
+		game._physics_process(1.0 / 60.0)
+	if anim.current_animation != game.jump_clip or anim.speed_scale != 0:
+		failures += 1
+	for code in [KEY_W, KEY_SHIFT]:
+		_set_key(code, false)
+	print("Sprint cycles=", wraps, " recovery_changes=", recovery_changes, " failures=", failures)
+	return failures
+
+func _set_key(code: Key, pressed: bool) -> void:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.physical_keycode = code
+	event.pressed = pressed
+	Input.parse_input_event(event)
+	Input.flush_buffered_events()

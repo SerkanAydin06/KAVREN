@@ -26,6 +26,8 @@ const PRIORITY_CHARACTER_FILES := [
 # ayrica hareket hizina gore olceklenir, ayaklar yerde kaymaz.
 const WALK_SPEED := 2.5
 const RUN_SPEED := 6.5
+const SPRINT_RECOVERY_STAMINA := 25.0
+const FALL_POSE_DELAY := 0.09
 const MODEL_HEIGHT := 1.8
 const GRAVITY := 18.0
 # Tek bir dosyadan tum araziyi kaplayan seam-free malzeme.
@@ -181,6 +183,8 @@ var fire_positions: Array[Vector3] = [CAMP_POSITION]
 var _tool_materials: Dictionary = {}
 var equipped_pickaxe: Node3D
 var stamina := 100.0
+var sprint_exhausted := false
+var ungrounded_time := 0.0
 var camera_distance := 5.0
 var pending_chop_target: Node3D = null
 var pending_chop_timer := 0.0
@@ -1299,7 +1303,9 @@ func _update_character_animation(delta: float, moving: bool, sprinting: bool) ->
 		else:
 			current_animation_state = "Jump" if jump_phase != "land" else "Landing"
 			return
-	var airborne := not player.is_on_floor()
+	# Brief losses of floor contact on uneven ground should not rewind the stride.
+	ungrounded_time = 0.0 if player.is_on_floor() else ungrounded_time + delta
+	var airborne := ungrounded_time >= FALL_POSE_DELAY
 	var target := ""
 	if airborne and not jump_clip.is_empty():
 		# Ziplamadan dusme (kenardan kayma): ziplama klibinin dusus pozu.
@@ -1727,6 +1733,8 @@ func _respawn() -> void:
 	_schedule_checkpoint()
 	health = MAX_HEALTH
 	stamina = 100.0
+	sprint_exhausted = false
+	ungrounded_time = 0.0
 	time_since_damage = 99.0
 	player.global_position = SPAWN_POSITION
 	player.velocity = Vector3.ZERO
@@ -1747,7 +1755,11 @@ func _physics_process(delta: float) -> void:
 		# Olurken ve balta/kazma savrulurken oyuncu yerinde kalir.
 		input = Vector2.ZERO
 	var direction := Basis(Vector3.UP, yaw) * Vector3(input.x, 0, input.y)
-	var sprint := Input.is_physical_key_pressed(KEY_SHIFT) and stamina > 1.0 and input.length_squared() > 0.01
+	if stamina <= 1.0:
+		sprint_exhausted = true
+	elif stamina >= SPRINT_RECOVERY_STAMINA:
+		sprint_exhausted = false
+	var sprint := Input.is_physical_key_pressed(KEY_SHIFT) and not sprint_exhausted and input.length_squared() > 0.01
 	stamina = clampf(stamina + (-22.0 if sprint else 16.0) * delta, 0.0, 100.0)
 	var speed := RUN_SPEED if sprint else WALK_SPEED
 	player.velocity.x = direction.x * speed
