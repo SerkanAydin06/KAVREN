@@ -51,5 +51,20 @@ func _run() -> void:
 	var pickaxe: Node3D = game.equipped_pickaxe
 	if pickaxe == null or pickaxe.get_parent() != mount or pickaxe.visible:
 		failures += 1
+	# Sag el yumruk yapmali: parmak kivirma modifier'i iskelette ve aktif.
+	var grip: Node = game.hand_grip
+	var curled := 0
+	if grip == null or grip.get_parent() != game.skeleton:
+		failures += 1
+	else:
+		curled = grip.curled_bone_count()
+		if curled < 12:
+			failures += 1
+	# Kavrama noktasi avuc icinde: el kemiginden parmak koklerine dogru,
+	# bilegin gerisinde veya parmak uclarinin otesinde degil.
+	var local_grip: Vector3 = axe.position
+	if local_grip.y <= 0.0 or local_grip.length() > 0.6:
+		failures += 1
+	print("AshvaleWeaponTest grip curled_bones=", curled, " grip_local=", local_grip)
 	print("AshvaleWeaponTest bone=", hand_name, " world_scale=", world_scale, " hand_distance=", hand_distance, " model=", model_key, " meshes=", mesh_count, " triangles=", total_faces, " failures=", failures)
 	quit(1 if failures > 0 else 0)
