@@ -41,12 +41,10 @@ func fit(character: Node3D, skeleton: Skeleton3D) -> bool:
 	var skin_mesh := MeshInstance3D.new()
 	skin_mesh.name = "ValleyScout"
 	skin_mesh.mesh = surface.commit()
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.vertex_color_is_srgb = true
-	material.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
-	material.roughness = 0.92
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://assets/shaders/camp_ink.gdshader")
+	material.set_shader_parameter("vertex_paint", true)
+	material.set_shader_parameter("ink_width", 0.075)
 	skin_mesh.material_override = material
 	for old in character.find_children("*", "MeshInstance3D", true, false):
 		(old as MeshInstance3D).visible = false

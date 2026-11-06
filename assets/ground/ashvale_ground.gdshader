@@ -46,6 +46,18 @@ void fragment() {
     float detail = texture(ground_albedo, p / meters_per_tile).g;
     vec3 verge = mix(trail_edge.rgb, grass, smoothstep(0.05, 0.40, bank));
     ALBEDO = mix(dry_clay.rgb, verge, smoothstep(-0.18, 0.05, bank)) * (0.96 + detail * 0.09);
+    // Small grouped grass strokes along the verge, fading into broad color at distance.
+    vec2 cell_uv = p * vec2(1.85, 2.4);
+    vec2 id = floor(cell_uv);
+    vec2 q = fract(cell_uv) - 0.5;
+    float seed = hash21(id);
+    float stem = abs(q.x + (q.y + 0.05) * 0.49) - (0.029 - q.y * 0.07);
+    float tip = abs(q.y + 0.025) - 0.175;
+    float mark = max(stem, tip);
+    float aa = max(0.009, length(fwidth(cell_uv)));
+    float grass_mark = (1.0 - smoothstep(-aa, aa, mark)) * step(0.66, seed);
+    float close_up = 1.0 - smoothstep(0.04, 0.15, aa);
+    ALBEDO *= 1.0 - 0.28 * close_up * grass_mark * smoothstep(0.4, 0.8, bank) * (1.0-smoothstep(5.0, 10.0, bank));
     ROUGHNESS = 1.0;
     SPECULAR = 0.06;
 }
