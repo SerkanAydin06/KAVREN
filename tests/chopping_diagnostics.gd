@@ -19,10 +19,26 @@ func _run() -> void:
 		push_error("AshvaleChopTest missing oak")
 		quit(1)
 		return
-	original.position = Vector3(0, 0, -2.0)
+	# Uzaktan vurulamaz: govde yuzeyine 2.5 m.
+	var trunk_radius: float = game._target_radius(original)
+	original.position = Vector3(0, 0, -(trunk_radius + 2.5))
 	game.player.position = Vector3.ZERO
 	game.yaw = 0.0
-	var failures := 0
+	game.attack_remaining = 0.0
+	game._start_attack()
+	var far_ok: bool = game.pending_chop_target == null
+	game.attack_remaining = 0.0
+	# Arkadaki agaca da vurulmaz.
+	original.position = Vector3(0, 0, trunk_radius + 0.6)
+	game._start_attack()
+	var behind_ok: bool = game.pending_chop_target == null
+	game.attack_remaining = 0.0
+	original.position = Vector3(0, 0, -(trunk_radius + 0.6))
+	game.player.position = Vector3.ZERO
+	game.yaw = 0.0
+	var failures := 0 if far_ok and behind_ok else 1
+	if not far_ok or not behind_ok:
+		print("AshvaleChopTest reach check failed far=", far_ok, " behind=", behind_ok)
 	var timber_count := 0
 	for hit in range(3):
 		game.attack_remaining = 0.0

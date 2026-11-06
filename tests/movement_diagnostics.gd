@@ -57,6 +57,30 @@ func _run() -> void:
 		failures += 1
 	game.jump_phase = ""
 	game.player.velocity = Vector3.ZERO
+	# Vurus sirasinda W basili olsa bile oyuncu ilerlemez.
+	var press := InputEventKey.new()
+	press.physical_keycode = KEY_W
+	press.keycode = KEY_W
+	press.pressed = true
+	Input.parse_input_event(press)
+	Input.flush_buffered_events()
+	game.player.global_position = Vector3(10, 0.1, 10)
+	await physics_frame
+	game._physics_process(0.05)
+	var walked: float = Vector2(game.player.velocity.x, game.player.velocity.z).length()
+	game.attack_remaining = 0.0
+	game._start_attack()
+	game._physics_process(0.05)
+	var swing_velocity: float = Vector2(game.player.velocity.x, game.player.velocity.z).length()
+	if walked < 1.0 or swing_velocity > 0.001:
+		failures += 1
+	var release := press.duplicate() as InputEventKey
+	release.pressed = false
+	Input.parse_input_event(release)
+	Input.flush_buffered_events()
+	game.attack_remaining = 0.0
+	game.pending_chop_target = null
+	game.player.velocity = Vector3.ZERO
 	# Kamp atesi: atesin icinde can azalir, sifirda olum.
 	game.player.global_position = game.CAMP_POSITION + Vector3(0.2, 0.1, 0)
 	game._update_health(0.5)
@@ -77,5 +101,5 @@ func _run() -> void:
 	game._respawn()
 	if game.is_dead or game.health != game.MAX_HEALTH or game.player.global_position.distance_to(game.SPAWN_POSITION) > 0.01 or anim.current_animation != game.idle_clip:
 		failures += 1
-	print("AshvaleMoveTest jump_speed=", snappedf(game.JUMP_PLAYBACK_SPEED, 0.001), " takeoff_delay=", snappedf(game.JUMP_TAKEOFF_DELAY, 0.001), " crouch=", snappedf(crouch_depth, 0.001), " burned_hp=", snappedf(burned, 0.1), " failures=", failures)
+	print("AshvaleMoveTest jump_speed=", snappedf(game.JUMP_PLAYBACK_SPEED, 0.001), " takeoff_delay=", snappedf(game.JUMP_TAKEOFF_DELAY, 0.001), " crouch=", snappedf(crouch_depth, 0.001), " burned_hp=", snappedf(burned, 0.1), " walk_v=", snappedf(walked, 0.01), " swing_v=", swing_velocity, " failures=", failures)
 	quit(1 if failures > 0 else 0)

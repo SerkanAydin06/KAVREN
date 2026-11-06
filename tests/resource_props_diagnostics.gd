@@ -51,7 +51,7 @@ func _run() -> void:
 	if ferns != game.FERN_COUNT or stumps != game.DECOR_STUMP_COUNT:
 		failures += 1
 	# Balta ile kaya kazilmaz; kazmaya gecince kazilir.
-	copper_rock.position = Vector3(0, 0, -1.8)
+	copper_rock.position = Vector3(0, 0, -(game._target_radius(copper_rock) + 0.6))
 	game.player.position = Vector3.ZERO
 	game.yaw = 0.0
 	game._select_tool("axe")
