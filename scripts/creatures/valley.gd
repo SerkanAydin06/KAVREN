@@ -480,6 +480,16 @@ static func _number(value: Variant) -> bool:
 	return (value is int or value is float) and is_finite(float(value))
 
 func _load_progress() -> void:
+	# Application names select a new user directory. Copy the existing adventure once.
+	if not FileAccess.file_exists(STATE_PATH):
+		var previous_folder := OS.get_user_data_dir().get_base_dir().path_join("Ashvale - Survival RPG Prototype")
+		var previous_save := previous_folder.path_join("ashvale-companions-v1.json")
+		if FileAccess.file_exists(previous_save):
+			var migrated := DirAccess.copy_absolute(previous_save, ProjectSettings.globalize_path(STATE_PATH))
+			if migrated != OK:
+				progress_writable = false
+				note = "Önceki kayıt aktarılamadı."
+				return
 	if not FileAccess.file_exists(STATE_PATH):
 		return
 	progress_writable = false
