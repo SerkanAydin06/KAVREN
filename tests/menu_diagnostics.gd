@@ -46,5 +46,5 @@ func _run() -> void:
 	await scene_changed
 	if not current_scene.roster.is_empty():
 		failures += 1
-	print("FilizyaMenuTest failures=",failures)
+	print("KavrenMenuTest failures=",failures)
 	quit(1 if failures else 0)

@@ -34,7 +34,7 @@ func _ready() -> void:
 	column.add_theme_constant_override("separation",12)
 	sheet.add_child(column)
 	var title := Label.new()
-	title.text = "FİLİZYA"
+	title.text = "KAVREN"
 	title.add_theme_font_size_override("font_size",64)
 	title.add_theme_color_override("font_color",Color("#ffe6ac"))
 	column.add_child(title)
@@ -59,7 +59,7 @@ func _ready() -> void:
 		new_button.grab_focus()
 	else:
 		continue_button.grab_focus()
-	print("Filizya menu ready")
+	print("Kavren menu ready")
 
 func _menu_button(column: VBoxContainer, caption: String, action: Callable) -> Button:
 	var button := Button.new()
@@ -71,7 +71,7 @@ func _menu_button(column: VBoxContainer, caption: String, action: Callable) -> B
 	return button
 
 func _has_adventure() -> bool:
-	return FileAccess.file_exists(STATE_PATH) or FileAccess.file_exists(_previous_save_path())
+	return FileAccess.file_exists(STATE_PATH) or not _previous_save_path().is_empty()
 
 func _request_new() -> void:
 	if _has_adventure():
@@ -81,11 +81,11 @@ func _request_new() -> void:
 
 func _start(fresh: bool) -> void:
 	if fresh:
-		get_tree().set_meta("filizya_new_game",true)
+		get_tree().set_meta("kavren_new_game",true)
 	var result := get_tree().change_scene_to_file(PLAY_SCENE)
 	if result != OK:
-		if get_tree().has_meta("filizya_new_game"):
-			get_tree().remove_meta("filizya_new_game")
+		if get_tree().has_meta("kavren_new_game"):
+			get_tree().remove_meta("kavren_new_game")
 		error_text.text = "Vadi açılamadı."
 
 func _physics_process(_delta: float) -> void:

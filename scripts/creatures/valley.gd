@@ -40,8 +40,8 @@ func _ready() -> void:
 	player.position = Vector3(0,0.2,4)
 	_make_companions()
 	_make_interface()
-	if get_tree().has_meta("filizya_new_game"):
-		get_tree().remove_meta("filizya_new_game")
+	if get_tree().has_meta("kavren_new_game"):
+		get_tree().remove_meta("kavren_new_game")
 		call_deferred("_checkpoint_creatures")
 	else:
 		_load_progress()
@@ -599,7 +599,7 @@ func _refresh_interface() -> void:
 		goal = "Filizik ile bir saha karşılaşması kazan" if levels[0]<2 else "Sarmaşık kapıya git · F ile Filizik'e yardım et"
 	if discovered:
 		goal = "Çiçekli açıklık keşfedildi!"
-	journal.text = "FİLİZYA · YOLDAŞLAR VADİSİ\n"+goal
+	journal.text = "KAVREN · YOLDAŞLAR VADİSİ\n"+goal
 	var team := "Ekibin henüz boş"
 	if not roster.is_empty():
 		team = "Yoldaş · "+COMPANION.SPECIES[active_species].name+"  Sv."+str(levels[active_species])+"  Deneyim "+str(experience[active_species])+"/"+str(levels[active_species]*10)
@@ -636,14 +636,18 @@ static func _number(value: Variant) -> bool:
 	return (value is int or value is float) and is_finite(float(value))
 
 func _previous_save_path() -> String:
-	var previous_folder := OS.get_user_data_dir().get_base_dir().path_join("Ashvale - Survival RPG Prototype")
-	return previous_folder.path_join("ashvale-companions-v1.json")
+	var parent := OS.get_user_data_dir().get_base_dir()
+	for old_name in ["Filizya", "Ashvale - Survival RPG Prototype"]:
+		var path := parent.path_join(old_name).path_join(STATE_PATH.get_file())
+		if FileAccess.file_exists(path):
+			return path
+	return ""
 
 func _load_progress() -> void:
 	# Application names select a new user directory. Copy the existing adventure once.
 	if not FileAccess.file_exists(STATE_PATH):
 		var previous_save := _previous_save_path()
-		if FileAccess.file_exists(previous_save):
+		if not previous_save.is_empty():
 			var migrated := DirAccess.copy_absolute(previous_save, ProjectSettings.globalize_path(STATE_PATH))
 			if migrated != OK:
 				progress_writable = false

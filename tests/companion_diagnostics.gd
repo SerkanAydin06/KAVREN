@@ -47,7 +47,7 @@ func _run() -> void:
 	if hit.is_empty() or absf(hit.position.y-game.height_at(0,-21))>0.08:
 		failures += 1
 	# Simulate a rename with a completed adventure in the old sibling folder.
-	var previous_folder := OS.get_user_data_dir().get_base_dir().path_join("Ashvale - Survival RPG Prototype")
+	var previous_folder := OS.get_user_data_dir().get_base_dir().path_join("Filizya")
 	DirAccess.make_dir_recursive_absolute(previous_folder)
 	var previous_save := previous_folder.path_join("ashvale-companions-v1.json")
 	DirAccess.copy_absolute(ProjectSettings.globalize_path(game.STATE_PATH), previous_save)
