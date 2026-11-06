@@ -8,72 +8,96 @@ func _run() -> void:
 	var failures := 0
 	await physics_frame
 	if not game.height_at(0,-21)>2 or game.creatures.size()!=3:
+		print("Check failed: if not game.height_at(0,-21)>2 or game.creatures.size()!=3:")
 		failures += 1
 	for pool: Vector4 in game.MEADOW.POOLS:
 		if game.height_at(pool.x,pool.y) >= game.MEADOW.relief(pool.x,pool.y)-0.035:
+			print("Check failed: if game.height_at(pool.x,pool.y) >= game.MEADOW.relief(pool.x,pool.y)-0.035:")
 			failures += 1
 	for creature in game.creatures:
 		if creature.visible:
+			print("Check failed: if creature.visible:")
 			failures += 1
 	for i in range(3):
 		var rules = game.COMPANION
 		if rules.damage(i,1,(i+1)%3,false) <= rules.damage(i,1,i,false) or rules.damage(i,1,(i+2)%3,false) >= rules.damage(i,1,i,false):
+			print("Check failed: if rules.damage(i,1,(i+1)%3,false) <= rules.damage(i,1,i,false) or rules.damage(i,1,(i+2)%3,false) >= rules.damage(i,1,i,false):")
 			failures += 1
 		if rules.max_hp(i,2)<=rules.max_hp(i,1) or rules.damage(i,2,i,true)<=rules.damage(i,2,i,false):
+			print("Check failed: if rules.max_hp(i,2)<=rules.max_hp(i,1) or rules.damage(i,2,i,true)<=rules.damage(i,2,i,false):")
 			failures += 1
 	game.player.position = game.creatures[0].position
 	game._interact()
 	game._interact()
 	if game.roster != [0] or game.berries!=1 or game.creatures[0].visible:
+		print("Check failed: if game.roster != [0] or game.berries!=1 or game.creatures[0].visible:")
 		failures += 1
 	game.player.position = game.creatures[1].position
 	game._check_habitat()
 	await game._battle_action(false,true)
 	if game.turn_count != 0:
+		print("Check failed: if game.turn_count != 0:")
 		failures += 1
 	if not game.battle_camera.current or not game.creatures[0].visible:
+		print("Check failed: if not game.battle_camera.current or not game.creatures[0].visible:")
 		failures += 1
 	for turn in range(6):
 		await game._battle_action(false)
 	if game.battle!=-1 or game.levels[0]!=2 or not game.creatures[1].tired:
+		print("Check failed: if game.battle!=-1 or game.levels[0]!=2 or not game.creatures[1].tired:")
 		failures += 1
 	game._interact()
 	if not game.roster.has(1):
+		print("Check failed: if not game.roster.has(1):")
 		failures += 1
 	game.player.position = Vector3(0,game.height_at(0,-33),-30)
 	if not game._open_path():
+		print("Check failed: if not game._open_path():")
 		failures += 1
 	game.active_species = 0
 	# A recruited partner can still train; switching partners cannot consume all encounters.
 	game._check_habitat()
 	if game.battle != -1:
+		print("Check failed: if game.battle != -1:")
 		failures += 1
 	game._begin_training(1)
 	await game._battle_action(false,true)
 	await game._battle_action(false,true)
 	if game.turn_count != 1:
+		print("Check failed: if game.turn_count != 1:")
 		failures += 1
 	for turn in range(6):
 		await game._battle_action(false)
 	if game.battle!=-1 or game.experience[game.active_species]<=0:
+		print("Check failed: if game.battle!=-1 or game.experience[game.active_species]<=0:")
 		failures += 1
 	game.player.position = Vector3(0,0,4)
 	game._check_habitat()
 	game.player.position = game.creatures[0].position
 	game._check_habitat()
 	if game.battle != 0 or game.wild_actor == game.creatures[0]:
+		print("Check failed: if game.battle != 0 or game.wild_actor == game.creatures[0]:")
 		failures += 1
 	game._finish_encounter()
 	game._check_habitat()
 	if game.battle >= 0 or game.creatures[0].visible:
+		print("Check failed: if game.battle >= 0 or game.creatures[0].visible:")
 		failures += 1
 	# The journal uses the same purchase gate as combat and the save loader.
 	game.sheet.open_for(0)
 	game.sheet.learn_requested.emit(0,0,1)
 	game.sheet.learn_requested.emit(0,1,0)
 	game.sheet.learn_requested.emit(0,1,0)
+	game.sheet.invest_requested.emit(0,game.STATS.FORCE)
 	game.sheet.closed.emit()
+	if game.attributes[0][game.STATS.FORCE] != 1 or game.STATS.valid(1,[3,0,0,0,0]) or game.STATS.valid(4,[0.5,0,0,0,0]):
+		print("Check failed: if game.attributes[0][game.STATS.FORCE] != 1 or game.STATS.valid(1,[3,0,0,0,0]) or game.STATS.valid(4,[0.5,0,0,0,0]):")
+		failures += 1
+	if game.STATS.critical(10,100)!=15 or game.STATS.critical(10,99)!=10:
+		print("Check failed: if game.STATS.critical(10,100)!=15 or game.STATS.critical(10,99)!=10:")
+		failures += 1
 	if game.learned[0] != ["bark"] or game.ally_hp(0) != game.COMPANION.max_hp(0,2)+9:
+		print("Check failed: if game.learned[0] != ['bark'] or game.ally_hp(0) != game.COMPANION.max_hp(0,2)+9:")
 		failures += 1
 	for species in range(3):
 		var tree = game.DEVELOPMENT
@@ -81,30 +105,45 @@ func _run() -> void:
 		for rank in range(3):
 			history.append(tree.PATHS[species][0][rank].id)
 		if not tree.valid_history(species,5,history) or tree.valid_history(species,4,history):
+			print("Check failed: if not tree.valid_history(species,5,history) or tree.valid_history(species,4,history):")
 			failures += 1
 		for rank in range(3):
 			history.append(tree.PATHS[species][1][rank].id)
 		if tree.valid_history(species,99,history):
+			print("Check failed: if tree.valid_history(species,99,history):")
 			failures += 1
 	game.levels[0] = 3
 	game._learn(0,1,1)
 	game._begin_training(2)
 	game.friend_energy = 14
+	game.ally_essence = 0
+	await game._battle_action(false,false,1)
+	if game.turn_count != 0 or game.technique_turn[1] != 1:
+		print("Check failed: if game.turn_count != 0 or game.technique_turn[1] != 1:")
+		failures += 1
+	game.ally_essence = game.STATS.ACTIVE_COST
 	await game._battle_action(false,false,1)
 	await game._battle_action(false,false,1)
-	if game.turn_count != 1 or game.rival_energy >= game.COMPANION.max_hp(2,game.wild_level) or game.technique_turn[1] != 5:
+	if game.turn_count != 1 or game.rival_energy >= game.COMPANION.max_hp(2,game.wild_level) or game.technique_turn[1] != 5 or game.ally_essence != 0:
+		print("Check failed: if game.turn_count != 1 or game.rival_energy >= game.COMPANION.max_hp(2,game.wild_level) or game.technique_turn[1] != 5 or game.ally_essence != 0:")
+		failures += 1
+	await game._battle_action(true)
+	if game.ally_essence != game.STATS.GUARD_RESTORE:
+		print("Check failed: if game.ally_essence != game.STATS.GUARD_RESTORE:")
 		failures += 1
 	game._finish_encounter()
 	game._checkpoint_creatures()
 	var restored: Node = load("res://creature_valley.tscn").instantiate()
 	root.add_child(restored)
 	restored.set_physics_process(false)
-	if not restored.gate_open or restored.roster != game.roster or restored.levels[0]!=3 or restored.learned != game.learned:
+	if not restored.gate_open or restored.roster != game.roster or restored.levels[0]!=3 or restored.learned != game.learned or restored.attributes != game.attributes:
+		print("Check failed: if not restored.gate_open or restored.roster != game.roster or restored.levels[0]!=3 or restored.learned != game.learned or restored.attributes != game.attributes:")
 		failures += 1
 	await physics_frame
 	var ray := PhysicsRayQueryParameters3D.create(Vector3(0,8,-21),Vector3(0,-5,-21))
 	var hit: Dictionary = game.get_world_3d().direct_space_state.intersect_ray(ray)
 	if hit.is_empty() or absf(hit.position.y-game.height_at(0,-21))>0.08:
+		print("Check failed: if hit.is_empty() or absf(hit.position.y-game.height_at(0,-21))>0.08:")
 		failures += 1
 	# Simulate a rename with a completed adventure in the old sibling folder.
 	var previous_folder := OS.get_user_data_dir().get_base_dir().path_join("Filizya")
@@ -113,6 +152,7 @@ func _run() -> void:
 	var legacy: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.STATE_PATH))
 	legacy.version = 1
 	legacy.erase("development")
+	legacy.erase("attributes")
 	var legacy_file := FileAccess.open(previous_save,FileAccess.WRITE)
 	legacy_file.store_string(JSON.stringify(legacy))
 	legacy_file.close()
@@ -121,6 +161,7 @@ func _run() -> void:
 	root.add_child(migrated)
 	migrated.set_physics_process(false)
 	if not migrated.gate_open or migrated.roster != game.roster or migrated.levels[0] != 3 or not migrated.learned[0].is_empty() or migrated.DEVELOPMENT.points(3,migrated.learned[0],0) != 3:
+		print("Check failed: if not migrated.gate_open or migrated.roster != game.roster or migrated.levels[0] != 3 or not migrated.learned[0].is_empty() or migrated.DEVELOPMENT.points(3,migrated.learned[0],0) != 3:")
 		failures += 1
 	DirAccess.remove_absolute(previous_save)
 	DirAccess.remove_absolute(game.STATE_PATH)

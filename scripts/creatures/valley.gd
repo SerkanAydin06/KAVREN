@@ -3,6 +3,14 @@ extends "res://scripts/main.gd"
 const COMPANION := preload("res://scripts/creatures/companion.gd")
 const MEADOW := preload("res://scripts/creatures/meadow.gd")
 const DEVELOPMENT := preload("res://scripts/creatures/development.gd")
+const STATS := preload("res://scripts/creatures/attributes.gd")
+var attributes := [[0,0,0,0,0],[0,0,0,0,0],[0,0,0,0,0]]
+var ally_profile: Dictionary
+var enemy_profile: Dictionary
+var ally_essence := 0
+var enemy_essence := 0
+var ally_charge := 0
+var enemy_charge := 0
 const SHEET := preload("res://scripts/creatures/creature_sheet.gd")
 var learned := [[],[],[]]
 var technique_turn := [1,1]
@@ -289,6 +297,7 @@ func _make_interface() -> void:
 	canvas.add_child(sheet)
 	sheet.learn_requested.connect(_learn)
 	sheet.closed.connect(_close_sheet)
+	sheet.invest_requested.connect(_invest)
 
 func _learn(species: int, path: int, depth: int) -> void:
 	if battle >= 0 or species not in roster or path not in [0,1] or depth not in [0,1,2]:
@@ -302,9 +311,19 @@ func _close_sheet() -> void:
 	sheet.hide()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
-func ally_hp(species: int) -> int:
-	return COMPANION.max_hp(species,levels[species]) + DEVELOPMENT.bonus(species,learned[species],"hp")
+func _invest(species: int, stat: int) -> void:
+	if battle >= 0 or species not in roster or stat < 0 or stat >= STATS.NAMES.size():
+		return
+	if STATS.remaining(levels[species],attributes[species]) > 0:
+		attributes[species][stat] += 1
+		_checkpoint_creatures()
+		sheet.refresh()
 
+func profile_for(species: int) -> Dictionary:
+	return STATS.profile(species,levels[species],attributes[species],learned[species])
+
+func ally_hp(species: int) -> int:
+	return profile_for(species).hp
 
 func _strength_meter(row: HBoxContainer, tint: Color) -> ProgressBar:
 	var meter := ProgressBar.new()
@@ -409,8 +428,14 @@ func _begin_training(index: int) -> void:
 	battle_camera.fov = 49
 	battle_camera.current = true
 	visuals.hide()
-	friend_energy = ally_hp(active_species)
-	rival_energy = COMPANION.max_hp(index,wild_level)
+	ally_profile = profile_for(active_species)
+	enemy_profile = STATS.profile(index,wild_level,STATS.UNTUNED,[])
+	friend_energy = ally_profile.hp
+	rival_energy = enemy_profile.hp
+	ally_essence = ally_profile.essence
+	enemy_essence = enemy_profile.essence
+	ally_charge = 0
+	enemy_charge = 0
 	turn_count = 0
 	note = "Rakip mevzi aldı. Hamleni seç."
 
@@ -541,6 +566,11 @@ func _battle_action(guard: bool, special := false, path := -1) -> void:
 		skill = DEVELOPMENT.PATHS[active_species][path][1]
 		if skill.id not in learned[active_species] or turn_count+1 < technique_turn[path]:
 			return
+	var cost := STATS.ACTIVE_COST if path >= 0 else (STATS.SPECIAL_COST if special else 0)
+	if cost > ally_essence:
+		return
+	ally_essence -= cost
+	if path >= 0:
 		technique_turn[path] = turn_count+4
 	resolving = true
 	var target := battle
@@ -548,9 +578,10 @@ func _battle_action(guard: bool, special := false, path := -1) -> void:
 	var rival := wild_actor
 	turn_count += 1
 	var heavy := turn_count % 3 == 0
-	var hp_limit := ally_hp(active_species)
+	var hp_limit := int(ally_profile.hp)
 	var known: Array = learned[active_species]
 	if guard:
+		ally_essence = mini(ally_profile.essence,ally_essence+STATS.GUARD_RESTORE)
 		friend_energy = mini(hp_limit,friend_energy+3+DEVELOPMENT.bonus(active_species,known,"guard_heal"))
 		note = "Savunma alındı."
 	elif skill.has("shield"):
@@ -561,8 +592,8 @@ func _battle_action(guard: bool, special := false, path := -1) -> void:
 		if special:
 			special_ready_turn = turn_count + 3
 		await _strike(ally,rival,special or not skill.is_empty())
-		var hit := COMPANION.damage(active_species,levels[active_species],target,special)
-		hit += DEVELOPMENT.bonus(active_species,known,"power") + int(skill.get("strike",0))
+		var hit := STATS.strike_damage(ally_profile,active_species,target,5 if special else 0)
+		hit += int(skill.get("strike",0))
 		if turn_count == 1:
 			hit += DEVELOPMENT.bonus(active_species,known,"opener")
 		if friend_energy*2 <= hp_limit:
@@ -571,6 +602,9 @@ func _battle_action(guard: bool, special := false, path := -1) -> void:
 			hit += int(skill.get("execute",0))
 		if heavy:
 			hit += int(skill.get("counter",0))
+		ally_charge += int(ally_profile.finesse)
+		hit = STATS.mitigate(STATS.critical(hit,ally_charge),enemy_profile)
+		ally_charge %= 100
 		friend_energy = mini(hp_limit,friend_energy+roundi(mini(hit,rival_energy)*float(skill.get("drain",0))))
 		friend_energy = maxi(1,friend_energy-int(skill.get("recoil",0)))
 		rival_energy -= hit
@@ -578,12 +612,18 @@ func _battle_action(guard: bool, special := false, path := -1) -> void:
 		_win_battle(target)
 		return
 	note = "Rakip ağır vuruşa geçti." if heavy else "Rakip karşılık veriyor."
-	await _strike(rival,ally,heavy and wild_level >= COMPANION.SPECIAL_LEVEL)
-	var incoming := COMPANION.damage(target,wild_level,active_species,heavy and wild_level >= COMPANION.SPECIAL_LEVEL)
+	var enemy_special := heavy and wild_level >= COMPANION.SPECIAL_LEVEL and enemy_essence >= STATS.SPECIAL_COST
+	if enemy_special:
+		enemy_essence -= STATS.SPECIAL_COST
+	await _strike(rival,ally,enemy_special)
+	var incoming := STATS.strike_damage(enemy_profile,target,active_species,5 if enemy_special else 0)
+	enemy_charge += int(enemy_profile.finesse)
+	incoming = STATS.critical(incoming,enemy_charge)
+	enemy_charge %= 100
 	if heavy:
 		incoming = roundi(incoming*1.4)
 	friend_energy = mini(hp_limit,friend_energy+DEVELOPMENT.bonus(active_species,known,"regen"))
-	friend_energy -= 1 if guard else maxi(1,incoming-int(skill.get("shield",0))-DEVELOPMENT.bonus(active_species,known,"armor"))
+	friend_energy -= 1 if guard else maxi(1,STATS.mitigate(incoming,ally_profile)-int(skill.get("shield",0))-DEVELOPMENT.bonus(active_species,known,"armor"))
 	rival_energy -= int(skill.get("reflect",0))
 	if rival_energy <= 0 and friend_energy > 0:
 		_win_battle(target)
@@ -730,12 +770,12 @@ func _refresh_interface() -> void:
 	if not roster.is_empty():
 		team = "Yoldaş · "+COMPANION.SPECIES[active_species].name+"  Sv."+str(levels[active_species])+"  Deneyim "+str(experience[active_species])+"/"+str(levels[active_species]*10)
 	if not roster.is_empty():
-		team += "  ·  Gelişim puanı %d" % DEVELOPMENT.points(levels[active_species],learned[active_species],active_species)
+		team += "  ·  Yetenek %d · Nitelik %d" % [DEVELOPMENT.points(levels[active_species],learned[active_species],active_species),STATS.remaining(levels[active_species],attributes[active_species])]
 	panel.text = team+"\nMeyve "+str(berries)+"  ·  FPS "+str(Engine.get_frames_per_second())+"\nWASD hareket · Shift koş · Space zıpla · Tab yoldaş · E etkileşim · F sarmaşık · G gelişim\n"+note
 	if battle >= 0:
 		prompt.text = ""
 		combat_card.show()
-		ally_meter.max_value = ally_hp(active_species)
+		ally_meter.max_value = ally_profile.hp
 		ally_meter.value = friend_energy
 		foe_meter.max_value = COMPANION.max_hp(battle,wild_level)
 		foe_meter.value = maxi(0,rival_energy)
@@ -744,15 +784,20 @@ func _refresh_interface() -> void:
 		var info: Dictionary = COMPANION.SPECIES[active_species]
 		var foe: Dictionary = COMPANION.SPECIES[battle]
 		var factor := COMPANION.potency(active_species,battle)
-		var foe_move: String = COMPANION.SPECIAL[battle] if shown_turn%3 == 0 and wild_level >= COMPANION.SPECIAL_LEVEL else foe.move
+		var foe_move: String = COMPANION.SPECIAL[battle] if shown_turn%3 == 0 and wild_level >= COMPANION.SPECIAL_LEVEL and enemy_essence >= STATS.SPECIAL_COST else foe.move
 		var special_hint := "Sv.2'de açılır" if levels[active_species] < COMPANION.SPECIAL_LEVEL else ("hazır" if shown_turn >= special_ready_turn else "bekle")
+		if ally_essence < STATS.SPECIAL_COST and levels[active_species] >= COMPANION.SPECIAL_LEVEL:
+			special_hint = "öz yetersiz"
 		combat_text.text = "%s · %s Sv.%d  %d can    /    %s · %s Sv.%d  %d can\n%s ×%.1f   ·   Rakip: %s (%s)\n[1] %s    [2] Savun    [3] %s (%s)    [Esc] Çekil" % [info.name,COMPANION.ELEMENT[active_species],levels[active_species],maxi(0,friend_energy),foe.name,COMPANION.ELEMENT[battle],wild_level,maxi(0,rival_energy),COMPANION.ELEMENT[active_species],factor,foe_move,threat,info.move,COMPANION.SPECIAL[active_species],special_hint]
 		for path in range(2):
 			var skill: Dictionary = DEVELOPMENT.PATHS[active_species][path][1]
 			if skill.id in learned[active_species]:
 				var remaining := maxi(0,int(technique_turn[path])-shown_turn)
 				var status := "hazır" if remaining == 0 else "%d tur" % remaining
+				if ally_essence < STATS.ACTIVE_COST:
+					status = "öz yetersiz"
 				combat_text.text += "   [%d] %s (%s)" % [4+path,skill.name,status]
+		combat_text.text += "\nÖz %d/%d   ·   Kritik %d/100   ·   Rakip özü %d   ·   [2] +4 öz   ·   [3] 4 öz   ·   [4–5] 6 öz" % [ally_essence,ally_profile.essence,ally_charge,enemy_essence]
 
 	else:
 		prompt.text = ""
@@ -760,7 +805,7 @@ func _refresh_interface() -> void:
 func _checkpoint_creatures() -> void:
 	if not progress_writable or get_tree().current_scene != self:
 		return
-	var data := {"version":2,"development":learned,"berries":berries,"roster":roster,"levels":levels,"xp":experience,"trust":creatures[0].trust,"tired":[creatures[0].tired,creatures[1].tired,creatures[2].tired],"active":active_species,"gate":gate_open,"discovered":discovered,"position":[player.position.x,player.position.y,player.position.z]}
+	var data := {"version":3,"attributes":attributes,"development":learned,"berries":berries,"roster":roster,"levels":levels,"xp":experience,"trust":creatures[0].trust,"tired":[creatures[0].tired,creatures[1].tired,creatures[2].tired],"active":active_species,"gate":gate_open,"discovered":discovered,"position":[player.position.x,player.position.y,player.position.z]}
 	var file := FileAccess.open(STATE_PATH+".tmp",FileAccess.WRITE)
 	if file == null:
 		note = "Kayıt dosyası yazılamadı."
@@ -797,7 +842,7 @@ func _load_progress() -> void:
 		return
 	progress_writable = false
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(STATE_PATH))
-	if not data is Dictionary or data.get("version") not in [1,2]:
+	if not data is Dictionary or data.get("version") not in [1,2,3]:
 		note = "Kayıt okunamadı. Önceki kayıt korunuyor."
 		return
 	for key in ["levels","xp","tired","position"]:
@@ -819,16 +864,29 @@ func _load_progress() -> void:
 			return
 	if not data.get("gate") is bool or not data.get("discovered") is bool:
 		return
-	if data.version == 2:
+	if data.version >= 2:
 		var saved: Variant = data.get("development")
 		if not saved is Array or saved.size() != 3:
 			return
 		for i in range(3):
 			if not DEVELOPMENT.valid_history(i,int(data.levels[i]),saved[i]):
 				return
-			if i not in data.roster and not saved[i].is_empty():
+			if not data.roster.has(i) and not data.roster.has(float(i)) and not saved[i].is_empty():
 				return
-		learned = saved.duplicate(true)
+	if data.version >= 3:
+		var allocations: Variant = data.get("attributes")
+		if not allocations is Array or allocations.size() != 3:
+			return
+		for i in range(3):
+			if not STATS.valid(int(data.levels[i]),allocations[i]):
+				return
+			if not data.roster.has(i) and not data.roster.has(float(i)) and allocations[i] != STATS.UNTUNED:
+				return
+		for i in range(3):
+			for stat in range(STATS.NAMES.size()):
+				attributes[i][stat] = int(allocations[i][stat])
+	if data.version >= 2:
+		learned = data.development.duplicate(true)
 	progress_writable = true
 	berries = clampi(int(data.berries),0,12)
 	creatures[0].trust = clampi(int(data.trust),0,2)

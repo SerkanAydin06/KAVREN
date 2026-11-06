@@ -41,6 +41,12 @@ func _capture() -> void:
 	scene.sheet.open_for(0)
 	for frame in range(4):
 		await RenderingServer.frame_post_draw
+	if root.get_texture().get_image().save_png(folder+"/attributes.png") != OK:
+		quit(1)
+		return
+	scene.sheet._page(true)
+	for frame in range(4):
+		await RenderingServer.frame_post_draw
 	if root.get_texture().get_image().save_png(folder+"/development.png") != OK:
 		quit(1)
 		return
