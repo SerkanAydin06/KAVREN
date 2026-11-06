@@ -4,6 +4,8 @@ func _initialize() -> void:
 	call_deferred("_capture")
 
 func _capture() -> void:
+	root.mode = Window.MODE_WINDOWED
+	root.size = Vector2i(960,540)
 	var valley: Node = load("res://creature_valley.tscn").instantiate()
 	root.add_child(valley)
 	valley.set_physics_process(false)

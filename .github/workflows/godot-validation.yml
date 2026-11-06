@@ -198,7 +198,11 @@ jobs:
         run: |
           set -o pipefail
           export XDG_DATA_HOME="$RUNNER_TEMP/ashvale-art-data"
-          timeout 150s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --rendering-driver vulkan --rendering-method forward_plus --audio-driver Dummy --windowed --resolution 960x540 --path . --script res://tests/ground_shadow_views.gd 2>&1 | tee ground-views.log
+          sudo apt-get update -qq
+          sudo apt-get install -y mesa-vulkan-drivers
+          export VK_DRIVER_FILES="$(find /usr/share/vulkan/icd.d -name 'lvp*json' -print -quit)"
+          test -f "$VK_DRIVER_FILES"
+          timeout 180s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --rendering-driver vulkan --rendering-method forward_plus --audio-driver Dummy --windowed --resolution 960x540 --path . --script res://tests/ground_shadow_views.gd 2>&1 | tee ground-views.log
           if grep -E 'SHADER ERROR|SCRIPT ERROR|^ERROR:' ground-views.log; then exit 1; fi
       - name: Upload valley views
         uses: actions/upload-artifact@v4
