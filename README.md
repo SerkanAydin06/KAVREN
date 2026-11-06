@@ -25,10 +25,13 @@ Godot **4.7.x** (önerilen: 4.7.2) ile oluşturulmuş, üçüncü şahıs keşif
 | Fare tekerleği | Kamera uzaklığı |
 | Shift | Koş (dayanıklılık tüketir) |
 | Space | Zıpla (Jump.fbx animasyonuyla) |
-| Sol tık | Seçili aletle vur: balta ağaç keser, kazma kaya/cevher kırar |
-| 1 / 2 | Balta / Kazma seç |
+| Sol tık | Seçili eşyayı kullan: balta keser, kazma kazar, kamp ateşi kurar |
+| 1–6 | Hızlı seçim çubuğundan eşya seç |
+| Tab | Envanter ve üretim penceresi |
+| H | Kontroller yardımı |
+| F3 | Hata ayıklama bilgisi (karakter, animasyon, FPS) |
 | R | Öldükten sonra kampta yeniden doğ |
-| E | Yerdeki odun, taş, bakır veya demir parçasını topla |
+| E | Yerdeki parçayı topla / eğrelti otundan lif topla |
 | Esc | Fareyi serbest bırak / yakala |
 | T | Saati 1 saat ileri sar |
 | F11 | Tam ekran / pencere |
@@ -275,3 +278,41 @@ Char1 FBX iskelet/modeli genellikle santimetre ölçeğiyle geliyor. Oyuncu mode
 **Test:** `tests/atmosphere_diagnostics.gd` (CI'de çalışır).
 
 **Performans notu:** SDFGI, hacimsel sis ve PCSS gölgeler en pahalı ayarlar. Oyun takılırsa sırasıyla `environment.sdfgi_enabled`, `volumetric_fog_enabled` ve `sun.light_angular_distance` (`scripts/atmosphere.gd`) kısılabilir; en büyük kazanç yine Meshy modellerinin düşük poligonlu sürümlerinden gelir.
+
+## Envanter, üretim ve alet ilerlemesi — 2026-11-06
+
+**Envanter** (`scripts/inventory.gd`): 24 yuva. İlk 6 yuva alttaki hızlı seçim çubuğu (1–6).
+- Aynı eşyalar üst üste birikir (malzemeler 50'ye kadar).
+- `Tab` penceresinde eşyalar sürüklenip bırakılarak düzenlenir; aynı eşyalar birleşir, farklılar yer değiştirir.
+- Envanter doluysa yerdeki parça alınmaz, uyarı çıkar.
+
+**Eşyalar ve tarifler** (`scripts/items.gd`):
+
+| Üretilen | Gerekenler | Not |
+| --- | --- | --- |
+| İp | 3 Bitki Lifi | Alet başlarını bağlar |
+| Meşale ×2 | 1 Odun, 2 Lif | Elde ışık verir |
+| Kamp Ateşi | 5 Odun, 6 Taş | Yeşil önizlemeyle istenen yere kurulur |
+| Taş Balta / Kazma | 3 Odun, 3 Taş, 1 İp | Başlangıç aletleri (yedek) |
+| Bakır Balta / Kazma | 3 Odun, 5 Bakır, 1 İp | Bakır kazma demir cevherini açar |
+| Demir Balta / Kazma | 3 Odun, 5 Demir, 2 İp | En güçlü aletler |
+
+**İlerleme:**
+- Oyuncu Taş Balta ve Taş Kazma ile başlar.
+- Alet gücü darbe sayısını belirler: ağaç taş baltayla 3, bakırla 2, demirle 1 darbede devrilir.
+- Demir cevheri en az Bakır Kazma ister; taş kazmayla vurulunca uyarı çıkar.
+- Aletler aynı Meshy modelini kullanır, seviyeye göre renklenir (taş gri, bakır turuncu, demir çelik).
+- Bitki lifi eğrelti otlarından `E` ile toplanır (2 lif); ot 4 dakika sonra yeniden büyür.
+- Kurulan kamp ateşleri ışık verir ve yakar (can sistemi tüm ateşleri dikkate alır).
+
+**Arayüz** (`scripts/ui/game_ui.gd`, `inventory_slot.gd`, `item_icon.gd`):
+- **Ekranda:** Sol üstte can ve dayanıklılık çubukları, sağ üstte saat (gündüz/gece), altta ikonlu hızlı seçim çubuğu ve seçili eşyanın adı, ortada bağlama göre ipucu (ör. "Ağacı kes (2 darbe)"), sağda toplama bildirimleri.
+- **`Tab` penceresi:** Envanter ızgarası; üretilebilenler parlak, üretilemeyenler soluk tarif listesi; malzemeler var/gereken renkli (yeşil/kırmızı); ilerleme çubuklu "ÜRET" butonu. Eşyanın üstüne gelince bilgi kutusu (kategori, açıklama, güç, seviye).
+- **İkonlar:** Kod ile çizilen vektör ikonlar, her çözünürlükte keskin.
+- **Ek:** `H` kontroller, `F3` hata ayıklama.
+
+**Test:** `tests/inventory_diagnostics.gd` (CI'de çalışır). Kapsadığı konular:
+- yığınlama, dolu envanter, sürükle-bırak
+- tarifler, bakır baltayla 2 darbe, demir kilidi
+- lif toplama, savurma sırasında alet değiştirememe
+- meşale, kamp ateşi kurma

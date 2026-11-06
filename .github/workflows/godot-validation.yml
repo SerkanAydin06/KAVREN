@@ -166,3 +166,14 @@ jobs:
             exit 1
           fi
           grep -E "AshvaleAtmosphereTest .*failures=0" godot-atmosphere.log
+
+      - name: Validate inventory, crafting, tool tiers and placement
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 150s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/inventory_diagnostics.gd 2>&1 | tee godot-inventory.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-inventory.log; then
+            echo "Inventory validation reported errors"
+            exit 1
+          fi
+          grep -E "AshvaleInventoryTest .*failures=0" godot-inventory.log
