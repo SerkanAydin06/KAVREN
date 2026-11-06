@@ -23,13 +23,15 @@ var _notch_surface := Vector3.ZERO
 var _notch_outward := Vector3.FORWARD
 
 var hits_taken: int = 0
+var damage_taken: float = 0.0
 var is_falling: bool = false
 var _fall_origin: Quaternion = Quaternion.IDENTITY
 var _fall_axis: Vector3 = Vector3.RIGHT
 var _fall_vector: Vector3 = Vector3.FORWARD
 var _original_world_position: Vector3 = Vector3.ZERO
 
-func take_axe_hit(attacker_world_position: Vector3) -> bool:
+# power: baltanin darbe gucu (Tas 1, Bakir 1.5, Demir 3). Agac MAX_HITS hasarda devrilir.
+func take_axe_hit(attacker_world_position: Vector3, power: float = 1.0) -> bool:
 	if is_falling:
 		return false
 	var towards_attacker := attacker_world_position - global_position
@@ -38,10 +40,11 @@ func take_axe_hit(attacker_world_position: Vector3) -> bool:
 		towards_attacker = Vector3.FORWARD
 	towards_attacker = towards_attacker.normalized()
 	hits_taken += 1
+	damage_taken += maxf(power, 0.1)
 	var impact := _find_impact(towards_attacker)
 	_update_notch(impact)
 	_emit_splinters(impact)
-	if hits_taken >= MAX_HITS:
+	if damage_taken >= float(MAX_HITS) - 0.001:
 		_begin_fall(-towards_attacker)
 	else:
 		var base_angle: float = rotation.z
@@ -115,7 +118,7 @@ func _update_notch(impact: Dictionary) -> void:
 		_notch_surface = Vector3(impact["point"])
 		_notch_outward = Vector3(impact["outward"])
 		_notch.global_transform = Transform3D(Basis.looking_at(-_notch_outward, Vector3.UP), _notch_surface)
-	_notch.set_progress(float(hits_taken) / float(MAX_HITS))
+	_notch.set_progress(minf(damage_taken / float(MAX_HITS), 1.0))
 
 func _emit_splinters(impact: Dictionary) -> void:
 	var start: Vector3 = Vector3(impact["point"]) + Vector3(impact["outward"]) * 0.05
@@ -263,3 +266,6 @@ func _material(tint: Color) -> StandardMaterial3D:
 	result.albedo_color = tint
 	result.roughness = 0.96
 	return result
+
+func remaining_hits(power: float) -> int:
+	return int(ceilf(maxf(float(MAX_HITS) - damage_taken, 0.0) / maxf(power, 0.1) - 0.001))

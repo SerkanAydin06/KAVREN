@@ -15,18 +15,21 @@ const CHUNK_COLORS := {
 @export var drop_count := 2
 
 var hits_taken: int = 0
+var damage_taken: float = 0.0
 var is_depleted: bool = false
 
-func take_pickaxe_hit(attacker_world_position: Vector3) -> bool:
+# power: kazmanin darbe gucu. max_hits = kayanin dayanikliligi.
+func take_pickaxe_hit(attacker_world_position: Vector3, power: float = 1.0) -> bool:
 	if is_depleted:
 		return false
 	hits_taken += 1
+	damage_taken += maxf(power, 0.1)
 	var towards_attacker := attacker_world_position - global_position
 	towards_attacker.y = 0.0
 	towards_attacker = towards_attacker.normalized() if towards_attacker.length_squared() > 0.001 else Vector3.FORWARD
 	_emit_chips(towards_attacker)
 	var model := get_node_or_null("Model") as Node3D
-	if hits_taken >= max_hits:
+	if damage_taken >= float(max_hits) - 0.001:
 		_deplete(towards_attacker)
 	elif model != null:
 		var rest := model.position
@@ -95,3 +98,6 @@ func _emit_chips(towards_attacker: Vector3) -> void:
 		flight.tween_property(chip, "position", chip.position + side * 0.5 + Vector3(0, 0.25, 0), 0.18)
 		flight.tween_property(chip, "position:y", 0.03, 0.2)
 		flight.tween_callback(chip.queue_free)
+
+func remaining_hits(power: float) -> int:
+	return int(ceilf(maxf(float(max_hits) - damage_taken, 0.0) / maxf(power, 0.1) - 0.001))

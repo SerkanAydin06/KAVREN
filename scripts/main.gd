@@ -41,6 +41,16 @@ const MODEL_LIBRARY := preload("res://scripts/model_library.gd")
 const ATMOSPHERE_SCRIPT := preload("res://scripts/atmosphere.gd")
 const CAMPFIRE_SCRIPT := preload("res://scripts/campfire.gd")
 const MINEABLE_ROCK_SCRIPT := preload("res://scripts/mineable_rock.gd")
+const ITEMS := preload("res://scripts/items.gd")
+const INVENTORY_SCRIPT := preload("res://scripts/inventory.gd")
+const GAME_UI_SCRIPT := preload("res://scripts/ui/game_ui.gd")
+const TORCH_SCRIPT := preload("res://scripts/torch.gd")
+const STARTING_ITEMS := [["stone_axe", 1], ["stone_pickaxe", 1]]
+const FERN_FIBER := 2
+const FERN_REGROW_SECONDS := 240.0
+const FERN_REACH := 1.8
+const PLACE_DISTANCE := 2.2
+const PLACE_CLEARANCE := 1.4
 # Vurus erisimi: oyuncu merkezinden agac govdesi / kaya YUZEYINE metre.
 const MELEE_REACH := 1.0
 const MELEE_FACING_DOT := 0.5 # ~60 derecelik on koni
@@ -102,8 +112,6 @@ const ROCK_TYPES := {
 	"copper_ore": {"kind": "copper", "height": 1.0, "hits": 4, "drops": 2},
 	"iron_ore": {"kind": "iron", "height": 1.2, "hits": 5, "drops": 2},
 }
-const RESOURCE_LABELS := {"wood": "ODUN", "stone": "TAŞ", "copper": "BAKIR", "iron": "DEMİR"}
-const TOOL_LABELS := {"axe": "BALTA", "pickaxe": "KAZMA"}
 const FERN_COUNT := 36
 const DECOR_STUMP_COUNT := 5
 
@@ -139,11 +147,29 @@ var yaw := 0.0
 var pitch := -0.18
 var hud: Label
 var resource_nodes: Array[Node3D] = []
-var wood := 0
-var stone := 0
-var copper := 0
-var iron := 0
-var active_tool := "axe"
+# Kaynak sayaclari envanterden okunur (eski kod ve testler icin kisayol).
+var inventory: RefCounted = INVENTORY_SCRIPT.new()
+var wood: int:
+	get: return inventory.count("wood")
+	set(value): inventory.set_count("wood", value)
+var stone: int:
+	get: return inventory.count("stone")
+	set(value): inventory.set_count("stone", value)
+var copper: int:
+	get: return inventory.count("copper")
+	set(value): inventory.set_count("copper", value)
+var iron: int:
+	get: return inventory.count("iron")
+	set(value): inventory.set_count("iron", value)
+var active_tool := "" # "axe", "pickaxe", "torch", "place" ya da "" (bos el)
+var selected_slot := 0
+var equipped_item := ""
+var ui: CanvasLayer
+var torch: Node3D
+var placement_ghost: Node3D
+var placement_valid := false
+var fire_positions: Array[Vector3] = [CAMP_POSITION]
+var _tool_materials: Dictionary = {}
 var equipped_pickaxe: Node3D
 var stamina := 100.0
 var camera_distance := 5.0
@@ -155,6 +181,8 @@ var hand_grip: Node
 var atmosphere: Node3D
 
 func _ready() -> void:
+	for entry in STARTING_ITEMS:
+		inventory.add(String(entry[0]), int(entry[1]))
 	_make_world()
 	_make_player()
 	_make_axe()
@@ -162,6 +190,7 @@ func _ready() -> void:
 	_make_camp()
 	_make_stylized_preview()
 	_make_hud()
+	_select_slot(0)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _make_world() -> void:
@@ -405,7 +434,9 @@ func _make_ferns() -> void:
 		fern.rotation.y = fern_random.randf_range(0.0, TAU)
 		fern.add_child(model)
 		MODEL_LIBRARY.set_visibility_range(model, 40.0, false)
+		fern.set_meta("resource_type", "fern")
 		add_child(fern)
+		resource_nodes.append(fern)
 		placed += 1
 	print("Ashvale ferns: ", placed)
 
@@ -434,85 +465,71 @@ func _make_decor_stumps() -> void:
 		add_child(stump)
 
 func _make_hud() -> void:
-	var layer := CanvasLayer.new()
-	layer.name = "GameHUD"
-	add_child(layer)
-	var ui_root := Control.new()
-	ui_root.name = "HUDRoot"
-	ui_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ui_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	layer.add_child(ui_root)
-
-	var panel := PanelContainer.new()
-	panel.name = "ResourcePanel"
-	panel.position = Vector2(32, 32)
-	panel.custom_minimum_size = Vector2(470, 0)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.025, 0.04, 0.05, 0.84)
-	style.corner_radius_top_left = 14
-	style.corner_radius_top_right = 14
-	style.corner_radius_bottom_left = 14
-	style.corner_radius_bottom_right = 14
-	style.content_margin_left = 22
-	style.content_margin_right = 22
-	style.content_margin_top = 16
-	style.content_margin_bottom = 16
-	panel.add_theme_stylebox_override("panel", style)
-	ui_root.add_child(panel)
-
-	hud = Label.new()
-	hud.name = "ResourceInfo"
-	hud.add_theme_font_size_override("font_size", 27)
-	hud.add_theme_color_override("font_color", Color.WHITE)
-	hud.add_theme_color_override("font_shadow_color", Color.BLACK)
-	hud.add_theme_constant_override("shadow_offset_x", 1)
-	hud.add_theme_constant_override("shadow_offset_y", 2)
-	panel.add_child(hud)
-
-	var controls := Label.new()
-	controls.name = "Controls"
-	controls.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	controls.offset_left = 32
-	controls.offset_right = 1240
-	controls.offset_top = -90
-	controls.offset_bottom = -32
-	controls.add_theme_font_size_override("font_size", 24)
-	controls.add_theme_color_override("font_color", Color(0.94, 0.96, 0.96))
-	controls.add_theme_color_override("font_shadow_color", Color.BLACK)
-	controls.add_theme_constant_override("shadow_offset_x", 2)
-	controls.add_theme_constant_override("shadow_offset_y", 2)
-	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Topla    1  Balta    2  Kazma    R  Yeniden Doğ    T  +1 Saat\nFARE  Kamera / Zoom    SOL TIK  Kes / Kaz    ESC  İmleç    F11  Tam Ekran"
-	controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ui_root.add_child(controls)
+	ui = GAME_UI_SCRIPT.new()
+	ui.name = "GameUI"
+	add_child(ui)
+	ui.setup(inventory)
+	hud = ui.hint_label
+	inventory.changed.connect(_on_inventory_changed)
 	_update_hud()
 
+func _on_inventory_changed() -> void:
+	# Secili yuvadaki esya degistiyse (uretim, surukleme, kurulum) yeniden kusan.
+	if inventory.item_at(selected_slot) != equipped_item:
+		_equip_selected()
+
 func _update_hud() -> void:
-	var nearby := _nearest_resource()
+	if ui == null:
+		return
 	var hint := ""
-	if nearby != null:
-		var kind := String(nearby.get_meta("resource_type")).trim_suffix("_drop")
-		hint = "\n[E] %s topla" % RESOURCE_LABELS.get(kind, kind.to_upper())
-	elif active_tool == "axe":
-		var nearby_tree := _nearest_choppable_tree()
-		if nearby_tree != null:
-			hint = "\n[SOL TIK] AGACI KES (%d/%d)" % [nearby_tree.hits_taken, nearby_tree.MAX_HITS]
-		elif _nearest_mineable_rock() != null:
-			hint = "\n[2] Kayayı kırmak için KAZMA'ya geç"
-	else:
-		var nearby_rock := _nearest_mineable_rock()
-		if nearby_rock != null:
-			hint = "\n[SOL TIK] %s KAZ (%d/%d)" % [RESOURCE_LABELS.get(nearby_rock.resource_kind, "TAŞ"), nearby_rock.hits_taken, nearby_rock.max_hits]
-		elif _nearest_choppable_tree() != null:
-			hint = "\n[1] Ağacı kesmek için BALTA'ya geç"
+	var nearby := _nearest_resource()
+	var fern := _nearest_fern()
+	var power := ITEMS.tool_power(equipped_item)
 	if is_dead:
-		hint = "\nÖLDÜN  —  [R] kampta yeniden doğ"
+		hint = "ÖLDÜN  —  [R] kampta yeniden doğ"
 	elif burning:
-		hint = "\nATEŞ YAKIYOR! Uzaklaş"
-	var clock := ""
+		hint = "ATEŞ YAKIYOR!  Uzaklaş"
+	elif nearby != null:
+		var kind := String(nearby.get_meta("resource_type")).trim_suffix("_drop")
+		hint = "[E]  %s topla" % ITEMS.display_name(kind)
+	elif fern != null:
+		hint = "[E]  Bitki lifi topla"
+	elif active_tool == "axe":
+		var tree := _nearest_choppable_tree()
+		if tree != null:
+			hint = "[SOL TIK]  Ağacı kes   (%d darbe)" % tree.remaining_hits(power)
+		elif _nearest_mineable_rock() != null:
+			hint = "Kayayı kırmak için kazma seç"
+	elif active_tool == "pickaxe":
+		var rock := _nearest_mineable_rock()
+		if rock != null:
+			var need: int = ITEMS.MINE_TIER.get(rock.resource_kind, 1)
+			if ITEMS.tool_tier(equipped_item) < need:
+				hint = "%s için Bakır Kazma veya daha iyisi gerekli" % ITEMS.display_name(rock.resource_kind)
+			else:
+				hint = "[SOL TIK]  %s kaz   (%d darbe)" % [ITEMS.display_name(rock.resource_kind), rock.remaining_hits(power)]
+		elif _nearest_choppable_tree() != null:
+			hint = "Ağacı kesmek için balta seç"
+	elif active_tool == "place":
+		hint = "[SOL TIK]  Kamp ateşini kur" if placement_valid else "Buraya kurulamaz"
+	ui.set_hint(hint)
+	ui.set_status(health, MAX_HEALTH, stamina)
 	if atmosphere != null:
-		clock = "    SAAT  %s%s" % [atmosphere.clock_text(), "  (GECE)" if atmosphere.is_night() else ""]
-	hud.text = "ASHVALE  •  KEŞİF%s\nCAN  %d    ODUN  %d    TAŞ  %d    BAKIR  %d    DEMİR  %d\nALET  %s    DAYANIKLILIK  %d%%%s\nKARAKTER  %s  |  %s\nANİMASYON  %s" % [clock, int(ceilf(health)), wood, stone, copper, iron, TOOL_LABELS[active_tool], int(stamina), hint, loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status, current_animation_state]
+		ui.set_clock(atmosphere.clock_text(), atmosphere.is_night())
+	ui.set_debug("KARAKTER  %s  |  %s\nANİMASYON  %s\nPOZİSYON  %s\nFPS  %d" % [loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status, current_animation_state, str(player.global_position.snapped(Vector3.ONE * 0.1)), Engine.get_frames_per_second()])
+
+func _nearest_fern() -> Node3D:
+	var best: Node3D = null
+	var best_distance := FERN_REACH
+	for node in resource_nodes:
+		if not is_instance_valid(node) or not node.visible or String(node.get_meta("resource_type", "")) != "fern":
+			continue
+		var relative := node.global_position - player.global_position
+		relative.y = 0.0
+		if relative.length() < best_distance:
+			best_distance = relative.length()
+			best = node
+	return best
 
 func _nearest_resource() -> Node3D:
 	var best: Node3D = null
@@ -582,21 +599,38 @@ func _register_drops(drops: Array) -> void:
 func _collect_resource() -> void:
 	var target := _nearest_resource()
 	if target == null:
+		_harvest_fern()
 		return
 	var kind := String(target.get_meta("resource_type")).trim_suffix("_drop")
 	var amount := int(target.get_meta("wood_amount", target.get_meta("amount", 1)))
-	match kind:
-		"wood":
-			wood += amount
-		"stone":
-			stone += amount
-		"copper":
-			copper += amount
-		"iron":
-			iron += amount
+	var leftover: int = inventory.add(kind, amount)
+	if leftover >= amount:
+		if ui != null:
+			ui.toast("Envanter dolu", "", Color(0.95, 0.42, 0.36))
+		return
+	if leftover > 0:
+		target.set_meta("wood_amount", leftover)
+		target.set_meta("amount", leftover)
+		return
 	resource_nodes.erase(target)
 	target.queue_free()
 	_update_hud()
+
+func _harvest_fern() -> void:
+	var fern := _nearest_fern()
+	if fern == null:
+		return
+	if inventory.add("fiber", FERN_FIBER) >= FERN_FIBER:
+		if ui != null:
+			ui.toast("Envanter dolu", "", Color(0.95, 0.42, 0.36))
+		return
+	fern.visible = false
+	# Egrelti bir sure sonra yeniden buyur.
+	get_tree().create_timer(FERN_REGROW_SECONDS).timeout.connect(func() -> void:
+		if is_instance_valid(fern):
+			fern.scale = Vector3.ONE * 0.2
+			fern.visible = true
+			fern.create_tween().tween_property(fern, "scale", Vector3.ONE, 1.5).set_trans(Tween.TRANS_BACK))
 
 func _advance_axe_impact(delta: float) -> void:
 	if pending_chop_target == null:
@@ -611,24 +645,133 @@ func _advance_axe_impact(delta: float) -> void:
 	if target.has_method("take_axe_hit"):
 		if _surface_distance(target) > MELEE_REACH + 0.3:
 			return
-		if target.take_axe_hit(player.global_position) and target.is_falling:
+		if target.take_axe_hit(player.global_position, ITEMS.tool_power(equipped_item)) and target.is_falling:
 			resource_nodes.erase(target)
 	elif target.has_method("take_pickaxe_hit"):
 		if _surface_distance(target) > MELEE_REACH + 0.3:
 			return
-		if target.take_pickaxe_hit(player.global_position) and target.is_depleted:
+		var need: int = ITEMS.MINE_TIER.get(target.resource_kind, 1)
+		if ITEMS.tool_tier(equipped_item) < need:
+			if ui != null:
+				ui.toast("Kazma çok zayıf: %s için Bakır Kazma gerekli" % ITEMS.display_name(target.resource_kind), "copper_pickaxe", Color(0.95, 0.42, 0.36))
+			return
+		if target.take_pickaxe_hit(player.global_position, ITEMS.tool_power(equipped_item)) and target.is_depleted:
 			resource_nodes.erase(target)
 
+# Eski arayuz: alet turune gore hotbar'daki ilk uygun yuvayi sec.
 func _select_tool(tool_name: String) -> void:
-	if not TOOL_LABELS.has(tool_name) or attack_remaining > 0.0:
+	for i in range(inventory.HOTBAR_SIZE):
+		if ITEMS.tool_kind(inventory.item_at(i)) == tool_name:
+			_select_slot(i)
+			return
+
+func _select_slot(index: int) -> void:
+	if attack_remaining > 0.0 or index < 0 or index >= inventory.HOTBAR_SIZE:
 		return
-	active_tool = tool_name
+	selected_slot = index
+	_equip_selected()
+	if ui != null:
+		ui.set_selected(index)
+
+func _equip_selected() -> void:
+	equipped_item = inventory.item_at(selected_slot)
+	active_tool = ITEMS.tool_kind(equipped_item)
 	if equipped_axe != null:
-		equipped_axe.visible = tool_name == "axe"
+		equipped_axe.visible = active_tool == "axe"
+		if active_tool == "axe":
+			_tint_tool(equipped_axe, equipped_item)
 	if equipped_pickaxe != null:
-		equipped_pickaxe.visible = tool_name == "pickaxe"
+		equipped_pickaxe.visible = active_tool == "pickaxe"
+		if active_tool == "pickaxe":
+			_tint_tool(equipped_pickaxe, equipped_item)
+	if torch != null:
+		torch.visible = active_tool == "torch"
+		torch.light.visible = torch.visible
+	if placement_ghost != null:
+		placement_ghost.visible = active_tool == "place"
 	if hud != null:
 		_update_hud()
+
+func _tint_tool(tool: Node3D, item_id: String) -> void:
+	# Ayni Meshy modeli; seviye rengine gore malzeme kopyasi (tas/bakir/demir).
+	var tint: Color = ITEMS.info(item_id).get("tint", Color.WHITE)
+	var key := String(tool.get_meta("model_key", "")) + ":" + item_id
+	for node in tool.find_children("*", "MeshInstance3D", true, false):
+		var mesh_node := node as MeshInstance3D
+		if not _tool_materials.has(key):
+			var base := MODEL_LIBRARY.material(String(tool.get_meta("model_key", "")))
+			if base == null:
+				return
+			var tinted := base.duplicate() as StandardMaterial3D
+			tinted.albedo_color = tint
+			_tool_materials[key] = tinted
+		for surface in range(mesh_node.get_surface_override_material_count()):
+			mesh_node.set_surface_override_material(surface, _tool_materials[key])
+
+func _make_placement_ghost() -> void:
+	placement_ghost = Node3D.new()
+	placement_ghost.name = "PlacementGhost"
+	placement_ghost.visible = false
+	add_child(placement_ghost)
+	var ring := MeshInstance3D.new()
+	ring.name = "Ring"
+	var torus := TorusMesh.new()
+	torus.inner_radius = 0.62
+	torus.outer_radius = 0.98
+	ring.mesh = torus
+	ring.scale = Vector3(1, 0.35, 1)
+	ring.position.y = 0.06
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.4, 1.0, 0.5, 0.45)
+	ring.material_override = mat
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	placement_ghost.add_child(ring)
+
+func _update_placement() -> void:
+	if placement_ghost == null or not placement_ghost.visible:
+		return
+	var forward := Basis(Vector3.UP, yaw) * Vector3.FORWARD
+	var spot := player.global_position + forward * PLACE_DISTANCE
+	spot.y = 0.0
+	placement_ghost.global_position = spot
+	placement_valid = _placement_clear(spot)
+	var mat := (placement_ghost.get_node("Ring") as MeshInstance3D).material_override as StandardMaterial3D
+	mat.albedo_color = Color(0.4, 1.0, 0.5, 0.45) if placement_valid else Color(1.0, 0.35, 0.3, 0.45)
+
+func _placement_clear(spot: Vector3) -> bool:
+	for fire in fire_positions:
+		if Vector2(fire.x - spot.x, fire.z - spot.z).length() < 2.2:
+			return false
+	for node in resource_nodes:
+		if not is_instance_valid(node) or not node.visible:
+			continue
+		var kind := String(node.get_meta("resource_type", ""))
+		if kind != "wood" and kind != "mineable":
+			continue
+		var distance := Vector2(node.global_position.x - spot.x, node.global_position.z - spot.z).length()
+		if distance < _target_radius(node) + PLACE_CLEARANCE:
+			return false
+	return true
+
+func _place_campfire() -> bool:
+	_update_placement()
+	if not placement_valid or equipped_item != "campfire":
+		if ui != null:
+			ui.toast("Buraya kurulamaz", "campfire", Color(0.95, 0.42, 0.36))
+		return false
+	var spot := placement_ghost.global_position
+	if not inventory.remove_from_slot(selected_slot, 1):
+		return false
+	var fire := CAMPFIRE_SCRIPT.new()
+	fire.name = "PlacedCampfire_%d" % fire_positions.size()
+	add_child(fire)
+	fire.global_position = spot
+	fire_positions.append(spot)
+	if ui != null:
+		ui.toast("Kamp ateşi kuruldu", "campfire")
+	return true
 
 
 func _make_player() -> void:
@@ -914,7 +1057,14 @@ func _import_external_clip(fbx_path: String, target_name: String, should_loop: b
 
 
 func _start_attack() -> void:
-	if animator == null or attack_clip.is_empty() or attack_remaining > 0.0 or is_dead or not jump_phase.is_empty():
+	if is_dead or (ui != null and ui.is_open):
+		return
+	if active_tool == "place":
+		_place_campfire()
+		return
+	if active_tool != "axe" and active_tool != "pickaxe":
+		return
+	if animator == null or attack_clip.is_empty() or attack_remaining > 0.0 or not jump_phase.is_empty():
 		return
 	var animation := animator.get_animation(attack_clip)
 	if animation == null:
@@ -1163,12 +1313,18 @@ func _make_axe() -> void:
 		mount.add_child(equipped_axe)
 		_place_tool(mount, equipped_axe)
 	equipped_pickaxe = _make_tool(mount, "pickaxe", "StarterPickaxe", 0.85)
+	torch = TORCH_SCRIPT.new()
+	torch.name = "HandTorch"
+	torch.set_meta("blade_sign", 1.0)
+	mount.add_child(torch)
+	_place_tool(mount, torch)
+	torch.visible = false
+	_make_placement_ghost()
 	if mount is BoneAttachment3D:
 		var grip_modifier := HAND_GRIP_SCRIPT.new()
 		grip_modifier.name = "RightHandGrip"
 		skeleton.add_child(grip_modifier)
 		hand_grip = grip_modifier
-	_select_tool("axe")
 	print("Ashvale equipped tools: mount=", hand_bone if not hand_bone.is_empty() else "fallback", " axe=", equipped_axe.get_meta("model_key", "procedural"), " pickaxe=", equipped_pickaxe != null, " world_scale=", equipped_axe.global_transform.basis.get_scale())
 
 func _make_tool(mount: Node3D, model_key: String, tool_name: String, length: float) -> Node3D:
@@ -1268,10 +1424,25 @@ func _unhandled_input(event: InputEvent) -> void:
 			pitch = clampf(pitch - event.relative.y * 0.003, -0.8, 0.35)
 			camera_pivot.rotation = Vector3(pitch, yaw, 0)
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
-		_collect_resource()
-	if event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_1 or event.keycode == KEY_2):
-		_select_tool("axe" if event.keycode == KEY_1 else "pickaxe")
+	if event is InputEventKey and event.pressed and not event.echo:
+		match event.keycode:
+			KEY_TAB:
+				_toggle_inventory()
+				get_viewport().set_input_as_handled()
+				return
+			KEY_H:
+				ui.toggle_help()
+			KEY_F3:
+				ui.toggle_debug()
+			KEY_E:
+				_collect_resource()
+			KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6:
+				_select_slot(int(event.keycode - KEY_1))
+	if ui != null and ui.is_open:
+		# Envanter aciksa fare arayuzu kullanir: kamera/saldiri yok.
+		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
+			_toggle_inventory()
+		return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -1289,6 +1460,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_start_attack()
 		else:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func _toggle_inventory() -> void:
+	if ui == null or is_dead:
+		return
+	var opened: bool = ui.toggle_inventory()
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if opened else Input.MOUSE_MODE_CAPTURED
 
 func _begin_jump() -> void:
 	if jump_clip.is_empty() or animator == null:
@@ -1319,9 +1496,13 @@ func _advance_jump(delta: float) -> void:
 func _update_health(delta: float) -> void:
 	if is_dead:
 		return
-	var to_fire := player.global_position - CAMP_POSITION
-	to_fire.y = 0.0
-	burning = to_fire.length() < FIRE_RADIUS
+	burning = false
+	for fire in fire_positions:
+		var to_fire := player.global_position - fire
+		to_fire.y = 0.0
+		if to_fire.length() < FIRE_RADIUS:
+			burning = true
+			break
 	if burning:
 		_take_damage(FIRE_DAMAGE_PER_SECOND * delta)
 	else:
@@ -1395,5 +1576,6 @@ func _physics_process(delta: float) -> void:
 		visuals.rotation.y = lerp_angle(visuals.rotation.y, atan2(direction.x, direction.z) + deg_to_rad(character_facing_offset), delta * 10.0)
 	_update_character_animation(delta, input.length_squared() > 0.01, sprint)
 	_advance_axe_impact(delta)
+	_update_placement()
 	camera_pivot.global_position = camera_pivot.global_position.lerp(player.global_position + Vector3(0, 1.5, 0), minf(delta * 8.0, 1.0))
 	_update_hud()
