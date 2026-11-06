@@ -23,6 +23,8 @@ var _root: Control
 var _health_fill: ColorRect
 var _health_text: Label
 var _stamina_fill: ColorRect
+var _warmth: Label
+var _night_goal: Label
 var _clock: Label
 var _clock_sub: Label
 var _hotbar_slots: Array = []
@@ -123,6 +125,10 @@ func _build() -> void:
 	var stamina_bar := _bar(Color(0.93, 0.76, 0.3))
 	_stamina_fill = stamina_bar[1]
 	status_box.add_child(stamina_bar[0])
+	_warmth = _label("", 16, TEXT)
+	status_box.add_child(_warmth)
+	_night_goal = _label("", 16, ACCENT)
+	status_box.add_child(_night_goal)
 
 	# Saat (sag ust)
 	var clock_panel := PanelContainer.new()
@@ -374,7 +380,7 @@ func _build_help() -> void:
 	_help.visible = false
 	_root.add_child(_help)
 	var text := _label("", 17, TEXT)
-	text.text = "KONTROLLER\n\nWASD  Hareket\nSHIFT  Koş\nSPACE  Zıpla\nFARE  Kamera / Tekerlek: yakınlaştır\nSOL TIK  Kullan (kes, kaz, kur)\n1–6  Hızlı seçim\nE  Topla / Eğrelti otundan lif\nTAB  Envanter & Üretim\nT  Saati 1 saat ileri sar\nR  Öldükten sonra yeniden doğ\nF3  Hata ayıklama bilgisi\nF11  Tam ekran\nESC  İmleç"
+	text.text = "KONTROLLER\n\nWASD  Hareket\nSHIFT  Koş\nSPACE  Zıpla\nFARE  Kamera / Tekerlek: yakınlaştır\nSOL TIK  Kullan (kes, kaz, kur)\n1–6  Hızlı seçim\nE  Topla / Ateşe odun ekle\nTAB  Envanter & Üretim\nT  Saati 1 saat ileri sar\nR  Öldükten sonra yeniden doğ\nF3  Hata ayıklama bilgisi\nF11  Tam ekran\nESC  İmleç"
 	_help.add_child(text)
 
 # ---------- guncelleme ----------
@@ -409,6 +415,12 @@ func set_status(health: float, max_health: float, stamina: float) -> void:
 	_health_fill.size.x = 300.0 * clampf(health / max_health, 0.0, 1.0)
 	_health_text.text = str(int(ceilf(health)))
 	_stamina_fill.size.x = 300.0 * clampf(stamina / 100.0, 0.0, 1.0)
+
+func set_survival(warmth: float, goal: String) -> void:
+	_warmth.text = "Vücut sıcaklığı  %d%%" % ceili(warmth)
+	_warmth.modulate = BAD if warmth < 25 else TEXT
+	_night_goal.text = goal
+	_night_goal.visible = not goal.is_empty()
 
 func set_clock(text: String, night: bool) -> void:
 	_clock.text = text
