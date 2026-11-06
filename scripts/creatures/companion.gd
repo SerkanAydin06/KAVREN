@@ -203,6 +203,8 @@ func patrol(delta: float, observer: Vector3) -> void:
 		rotation.y = lerp_angle(rotation.y,atan2(direction.x,direction.z),minf(delta*5,1))
 
 func _process(delta: float) -> void:
+	if not visible:
+		return
 	phase += delta
 	var stride := sin(phase*(8.5-species))
 	var lift := 0.03

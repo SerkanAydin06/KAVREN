@@ -59,6 +59,16 @@ static func populate(world: Node3D) -> void:
 				herbs.append(xf)
 			else:
 				scattered.append(xf)
+	# Taller plants mark the three encounter grounds from the trail.
+	for zone in range(HABITATS.size()):
+		for i in range(110):
+			var offset := Vector2.from_angle(rng.randf()*TAU) * sqrt(rng.randf()) * float(RADII[zone])
+			var point: Vector2 = HABITATS[zone] + offset
+			if POOLS.any(func(pool): return pool_distance(point,pool)<0.95):
+				continue
+			var tuft_scale := Vector3(1.4,2.0 if zone == 1 else 1.35,1.4)
+			var xf := Transform3D(Basis(Vector3.UP,rng.randf()*TAU).scaled(tuft_scale),Vector3(point.x,height(point.x,point.y)-0.035,point.y))
+			herbs.append(xf)
 	_batch(world,scattered,false)
 	_batch(world,herbs,true)
 

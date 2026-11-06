@@ -9,6 +9,9 @@ func _run() -> void:
 	await physics_frame
 	if not game.height_at(0,-21)>2 or game.creatures.size()!=3:
 		failures += 1
+	for pool: Vector4 in game.MEADOW.POOLS:
+		if game.height_at(pool.x,pool.y) >= game.MEADOW.relief(pool.x,pool.y)-0.035:
+			failures += 1
 	for creature in game.creatures:
 		if creature.visible:
 			failures += 1
@@ -53,6 +56,16 @@ func _run() -> void:
 	for turn in range(6):
 		await game._battle_action(false)
 	if game.battle!=-1 or game.experience[game.active_species]<=0:
+		failures += 1
+	game.player.position = Vector3(0,0,4)
+	game._check_habitat()
+	game.player.position = game.creatures[0].position
+	game._check_habitat()
+	if game.battle != 0 or game.wild_actor == game.creatures[0]:
+		failures += 1
+	game._finish_encounter()
+	game._check_habitat()
+	if game.battle >= 0 or game.creatures[0].visible:
 		failures += 1
 	game._checkpoint_creatures()
 	var restored: Node = load("res://creature_valley.tscn").instantiate()
