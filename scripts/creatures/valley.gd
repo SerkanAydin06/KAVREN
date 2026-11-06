@@ -33,6 +33,7 @@ func _ready() -> void:
 	_make_companions()
 	_make_interface()
 	_load_progress()
+	_refresh_interface()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	print("AshvaleCompanions ready: 3 species, rolling valley, friendship and exploration")
 
