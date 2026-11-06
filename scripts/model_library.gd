@@ -58,9 +58,14 @@ static func material(key: String) -> StandardMaterial3D:
 	var result := StandardMaterial3D.new()
 	result.resource_name = key
 	result.albedo_texture = albedo
+	result.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+	result.specular_mode = BaseMaterial3D.SPECULAR_TOON
+	if DOUBLE_SIDED.has(key):
+		result.albedo_color = Color("#e4ffd5")
 	var normal := _texture(key, "normal")
 	if normal != null:
 		result.normal_enabled = true
+		result.normal_scale = 0.32
 		result.normal_texture = normal
 	var roughness := _texture(key, "roughness")
 	result.roughness = 1.0 if roughness != null else 0.88
@@ -68,7 +73,7 @@ static func material(key: String) -> StandardMaterial3D:
 		result.roughness_texture = roughness
 	var metallic := _texture(key, "metallic")
 	if metallic != null:
-		result.metallic = 1.0
+		result.metallic = 0.45
 		result.metallic_texture = metallic
 	if DOUBLE_SIDED.has(key):
 		result.cull_mode = BaseMaterial3D.CULL_DISABLED

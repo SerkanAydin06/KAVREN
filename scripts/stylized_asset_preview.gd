@@ -7,13 +7,13 @@ extends Node3D
 const BARK := Color("#493325")
 const BARK_LIGHT := Color("#755039")
 const BARK_SHADE := Color("#39291f")
-const LEAF_DARK := Color("#526b3f")
-const LEAF_MED := Color("#66824a")
-const LEAF_LIGHT := Color("#85975d")
-const STONE := Color("#777b76")
-const STONE_LIGHT := Color("#93978b")
-const STONE_DARK := Color("#59645f")
-const MOSS := Color("#526b3f")
+const LEAF_DARK := Color("#38755c")
+const LEAF_MED := Color("#66a451")
+const LEAF_LIGHT := Color("#adcd65")
+const STONE := Color("#727f91")
+const STONE_LIGHT := Color("#a2afbc")
+const STONE_DARK := Color("#515f73")
+const MOSS := Color("#38755c")
 const CHOPPABLE_TREE_SCRIPT := preload("res://scripts/choppable_tree.gd")
 
 func _ready() -> void:
@@ -30,6 +30,7 @@ func _material(color: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
 	mat.roughness = 0.96
+	mat.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
 	mat.metallic = 0.0
 	return mat
 

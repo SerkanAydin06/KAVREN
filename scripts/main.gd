@@ -260,6 +260,8 @@ func _make_world() -> void:
 	terrain_material.shader = GROUND_SHADER
 	terrain_material.set_shader_parameter("ground_albedo", GROUND_ALBEDO)
 	terrain_material.set_shader_parameter("meters_per_tile", GROUND_TILE_METERS)
+	terrain_material.set_shader_parameter("camp_center", Vector2(CAMP_POSITION.x, CAMP_POSITION.z))
+	terrain_material.set_shader_parameter("mine_entry", Vector2(MINE.ENTRANCE.x, MINE.ENTRANCE.z))
 	surface.material_override = terrain_material
 	ground.add_child(surface)
 	# Gorunmeyen fizik kutusu: ust seviyesi tam y=0.
@@ -335,6 +337,7 @@ func _make_placeholder_tree(tree_root: Node3D, height_meters: float) -> void:
 
 
 func _make_camp() -> void:
+	add_child(preload("res://scripts/valley_scenery.gd").new())
 	# Meshy'nin dort farkli agaci ayni mesh/texture kaynaklarini paylasir.
 	# Prototipte 24 agac: karakterin etrafinda dogal, tekrar etmeyen yerlestirme.
 	var forest_scenes: Array[PackedScene] = []
@@ -354,6 +357,9 @@ func _make_camp() -> void:
 		var direction_angle := TAU * (float(i) + tree_random.randf_range(-0.3, 0.3)) / float(TREE_COUNT)
 		var distance := tree_random.randf_range(13.0, 48.0)
 		var tree_pos := Vector3(cos(direction_angle) * distance, 0.0, sin(direction_angle) * distance)
+		# Keep canopy silhouettes to either side of the view toward the hoist.
+		if tree_pos.z < -6 and absf(tree_pos.x) < 7:
+			tree_pos.x += 9.0 if tree_pos.x >= 0 else -9.0
 		var tree := CHOPPABLE_TREE_SCRIPT.new()
 		tree.name = "%s_%02d" % [TREE_NAMES[kind], i]
 		tree.connect("wood_dropped", _register_drops.bind(tree))

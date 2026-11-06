@@ -177,3 +177,18 @@ jobs:
             exit 1
           fi
           grep -E "AshvaleInventoryTest .*failures=0" godot-inventory.log
+
+      - name: Capture camp, trail and mine views
+        shell: bash
+        run: |
+          set -o pipefail
+          export XDG_DATA_HOME="$RUNNER_TEMP/ashvale-art-data"
+          timeout 180s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --rendering-method gl_compatibility --audio-driver Dummy --windowed --resolution 960x540 --path . --script res://tests/valley_views.gd 2>&1 | tee valley-views.log
+          if grep -E 'SHADER ERROR|SCRIPT ERROR|^ERROR:' valley-views.log; then exit 1; fi
+      - name: Upload valley views
+        uses: actions/upload-artifact@v4
+        with:
+          name: ashvale-valley-views
+          path: ${{ runner.temp }}/ashvale-art-data/**/valley-views/*.png
+          if-no-files-found: error
+          retention-days: 5
