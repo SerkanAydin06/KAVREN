@@ -124,3 +124,11 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - Oyun: `1` balta / `2` kazma; kazma `scripts/mineable_rock.gd` kaynaklarını kırar (taş, bakır, demir). Kaynak sayaçları: wood, stone, copper, iron.
 - Git LFS etkin (`.gitattributes`); CI `git lfs pull` + `.git/lfs` önbelleği kullanıyor. Geçmiş yeniden yazılmadı.
 - Yeni Meshy modelleri çok yüksek poligonlu (70 bin – 717 bin üçgen); düşük poligonlu yeniden dışa aktarma önerildi.
+
+## 2026-11-07 — Yaratık evreni için taslak üretim planı
+- Güncel KAVREN README ve creatures scriptleri incelendi: oynanabilir vadi prototipi, 3 tür (Filizik/Damlup/Çakılcık), sınırlı devriye ve iki komutlu sıra tabanlı savaş doğrulandı.
+- Yeni tasarım belgesi: [docs/KAVREN_CREATURE_PLAN.md](docs/KAVREN_CREATURE_PLAN.md) — 6 biyom/36 tür uzun vadeli katalog, önce 12 türe yönelik dalgalı üretim, olgun stil standardı, habitat/AI/savaş/rig/LOD/save v2 planı.
+- Bu değişiklik sadece tasarım belgesidir; kod, varlık, mevcut yaratık isimleri ve kayıt biçimi değiştirilmedi. Önerilen lore ve yeni türler henüz onaylanmış kanon değildir.
+- Doğrulama: GitHub bağlantısından kaynak okuma ve dokümantasyon yazımı; Godot başlatma/görsel QA yapılmadı.
+- Plan commit'i: https://github.com/SerkanAydin06/KAVREN/commit/f853564b9df691b21ad136a9b8a8b086573fee1f
+- Sıradaki iş: Önce ilk üç yaratığın tasarım/animasyon kalitesini onaylama, ardından CreatureDefinition ve sürümlü save tasarımına geçme.
