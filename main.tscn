@@ -1,3 +1,6 @@
-[gd_scene format=3]
+[gd_scene load_steps=2 format=3]
 
-[node name="Ashvale" type="Node3D"]
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+
+[node name="AshvalePrototype" type="Node3D"]
+script = ExtResource("1_main")
