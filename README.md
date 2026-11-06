@@ -34,7 +34,7 @@ Godot **4.7.x** (önerilen: 4.7.2) ile oluşturulmuş, üçüncü şahıs keşif
 
 ## Şu anda çalışan sistemler
 
-- Char1 Mixamo karakteri: Idle, Run, yavaşlatılmış Run ile yürüyüş, özel `AxeChop` savurma animasyonu
+- Char1 Mixamo karakteri: Idle, gerçek Walk, Run, Jump, Death ve özel `AxeChop` savurma animasyonu
 - Üçüncü şahıs takip kamerası ve yakınlaştırma, koşma dayanıklılığı
 - **Aletler:** Meshy el baltası ve kazması sağ el kemiğine bağlı; `1`/`2` ile değiştirilir
 - **Ağaç kesme:** 4 Meshy ağaç türünden 24 ağaç, 3 darbede devrilir, yerine Meshy kütüğü kalır, 3 odun düşer
@@ -45,7 +45,7 @@ Godot **4.7.x** (önerilen: 4.7.2) ile oluşturulmuş, üçüncü şahıs keşif
 
 ## Henüz bulunmayan sistemler
 
-Envanter ekranı, eşya üretimi (crafting), savaş, düşman yapay zekâsı, açlık/susuzluk, kayıt/yükleme sistemi. Gerçek yürüyüş adımları için hareketli bir `Walking_Animated.fbx` hâlâ gerekli.
+Envanter ekranı, eşya üretimi (crafting), savaş, düşman yapay zekâsı, açlık/susuzluk, kayıt/yükleme sistemi.
 
 ## Klasör yapısı ve dosya adları
 
@@ -231,3 +231,11 @@ Char1 FBX iskelet/modeli genellikle santimetre ölçeğiyle geliyor. Oyuncu mode
 - Zıplarken ve ölüyken balta/kazma savrulmaz.
 - Test: `tests/movement_diagnostics.gd` (CI'de çalışır).
 - Godot editörünün eski `assets/obje` yollarına ürettiği artık dosyalar (253 MB doku kopyası ve `.import`) silindi; klasör `.gitignore`'a eklendi. Bilgisayarındaki Godot'ta bu klasör tekrar oluşursa silebilirsin.
+
+## Yürüme animasyonu, vuruş menzili ve vuruşta durma — 2026-11-06
+
+- `Char1/Walking_Animated.fbx` (Mixamo Walking, Without Skin) eklendi; yavaşlatılmış koşu yedeği artık kullanılmıyor. `Walking.fbx` karakterin model/doku kaynağı olarak kalıyor.
+- Animasyon hızı adım uzunluğuna göre otomatik: kliplerin kendi ilerleme hızı ölçülür (yürüme 1.67 m/s, koşu 4.45 m/s) ve oynatma hızı = hareket hızı / klip hızı. Ayaklar yerde kaymaz.
+- Hareket hızları buna göre: yürüme **2.5 m/s** (eskiden 4), koşu **6.5 m/s** (eskiden 7). `WALK_SPEED` / `RUN_SPEED` değiştirilirse animasyon hızı kendiliğinden uyar.
+- Vuruş menzili artık ağaç gövdesinin / kayanın **yüzeyine** göre: en fazla **1 m** (`MELEE_REACH`) ve karakterin önündeki ~60°'lik koni (`MELEE_FACING_DOT`). Eskiden merkeze 3.4 m'den vurulabiliyordu.
+- Balta/kazma savrulurken oyuncu yerinde durur; savurma bitince hareket devam eder.

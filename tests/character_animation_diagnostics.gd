@@ -69,10 +69,13 @@ func _run() -> void:
 	game._update_character_animation(0.016, true, false)
 	var expected_walk: String = game.walk_clip if not game.walk_clip.is_empty() else game.run_clip
 	var walking_state_ok: bool = player_node.current_animation == expected_walk
-	var walking_speed_ok: bool = absf(player_node.speed_scale - (0.65 if game.walk_clip.is_empty() else 1.0)) < 0.01
+	# Gercek Walk klibi olmali ve animasyon hizi adim uzunluguna gore olceklenmeli.
+	var expected_walk_scale: float = game.WALK_SPEED / game.walk_clip_speed if game.walk_clip_speed > 0.1 else -1.0
+	var walking_speed_ok: bool = not game.walk_clip.is_empty() and not game.walking_animation_fallback and absf(player_node.speed_scale - expected_walk_scale) < 0.01
+	print("AshvaleAnimTest walk_clip_speed=", game.walk_clip_speed, " run_clip_speed=", game.run_clip_speed, " walk_scale=", player_node.speed_scale)
 	game._update_character_animation(0.016, true, true)
 	var running_state_ok: bool = player_node.current_animation == game.run_clip
-	var running_speed_ok: bool = absf(player_node.speed_scale - 1.0) < 0.01
+	var running_speed_ok: bool = absf(player_node.speed_scale - game.RUN_SPEED / game.run_clip_speed) < 0.01
 	game._start_attack()
 	var attack_state_ok: bool = player_node.current_animation == game.attack_clip
 	var dedicated_axe_ok: bool = game.attack_clip == "Ashvale/AxeChop"
@@ -86,7 +89,7 @@ func _run() -> void:
 	if not idle_state_ok or not walking_state_ok or not walking_speed_ok or not running_state_ok or not running_speed_ok or not attack_state_ok or not attack_speed_ok or not attack_duration_ok:
 		clip_failures += 1
 	# Root bone yatay konumunu koruyor mu?
-	for tested_name in [game.run_clip, game.attack_clip]:
+	for tested_name in [game.walk_clip, game.run_clip, game.attack_clip]:
 		var tested_animation: Animation = player_node.get_animation(tested_name)
 		for index in range(tested_animation.get_track_count()):
 			if tested_animation.track_get_type(index) != Animation.TYPE_POSITION_3D:

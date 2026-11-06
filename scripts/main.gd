@@ -22,8 +22,10 @@ const PRIORITY_CHARACTER_FILES := [
 @export_file("*.glb", "*.gltf", "*.fbx", "*.tscn") var character_file: String = ""
 # Meshy modelleri farkli ileri bakis yonlerinde olabilir.
 @export_range(-180.0, 180.0, 1.0) var character_facing_offset := 0.0
-const WALK_SPEED := 4.0
-const RUN_SPEED := 7.0
+# Hizlar Mixamo kliplerinin adim uzunluguna yakin secildi; animasyon hizi
+# ayrica hareket hizina gore olceklenir, ayaklar yerde kaymaz.
+const WALK_SPEED := 2.5
+const RUN_SPEED := 6.5
 const MODEL_HEIGHT := 1.8
 const GRAVITY := 18.0
 # Tek bir dosyadan tum araziyi kaplayan seam-free malzeme.
@@ -37,7 +39,9 @@ const CHOPPABLE_TREE_SCRIPT := preload("res://scripts/choppable_tree.gd")
 const AXE_SCRIPT := preload("res://scripts/stylized_axe.gd")
 const MODEL_LIBRARY := preload("res://scripts/model_library.gd")
 const MINEABLE_ROCK_SCRIPT := preload("res://scripts/mineable_rock.gd")
-const MINE_RANGE := 3.0
+# Vurus erisimi: oyuncu merkezinden agac govdesi / kaya YUZEYINE metre.
+const MELEE_REACH := 1.0
+const MELEE_FACING_DOT := 0.5 # ~60 derecelik on koni
 # Jump.fbx (2.17 sn) zaman cizelgesi: 0.20-0.55 comelme, ~0.75 kalkis,
 # 1.05 tepe, ~1.30 inis, 1.45 inis comelmesi, 1.75 toparlanma.
 const JUMP_VELOCITY := 6.0
@@ -66,7 +70,6 @@ const TOOL_GRIPS := {
 }
 const GRIP_ALONG_PALM := 0.78 # el kokunden parmak koklerine oran
 const GRIP_PALM_OFFSET := 0.032 # metre, avuc yuzeyinden sap merkezine
-const CHOP_RANGE := 3.4
 const CHOP_IMPACT_DELAY := 0.25
 const ATTACK_PLAYBACK_SPEED := 3.0 # 2.28 sn'lik AxeChop klibini ~0.76 sn'de oynat.
 # Tekrarlanan FBX sahneleri paylasilan Mesh/Texture kaynaklarini kullanir.
@@ -106,6 +109,8 @@ var animator: AnimationPlayer
 var skeleton: Skeleton3D
 var run_clip := ""
 var walk_clip := ""
+var walk_clip_speed := 0.0 # klibin kendi ilerleme hizi, m/s
+var run_clip_speed := 0.0
 var idle_clip := ""
 var jump_clip := ""
 var fall_clip := ""
@@ -529,40 +534,46 @@ func _nearest_resource() -> Node3D:
 	return best
 
 func _nearest_mineable_rock() -> Node3D:
-	var best: Node3D = null
-	var best_distance := MINE_RANGE
-	var forward := Basis(Vector3.UP, yaw) * Vector3.FORWARD
-	for node in resource_nodes:
-		if not is_instance_valid(node) or node.is_queued_for_deletion():
-			continue
-		if String(node.get_meta("resource_type", "")) != "mineable" or not node.has_method("take_pickaxe_hit"):
-			continue
-		var relative := node.global_position - player.global_position
-		relative.y = 0.0
-		var distance := relative.length()
-		if distance >= best_distance or distance < 0.001:
-			continue
-		if forward.dot(relative / distance) < 0.22:
-			continue
-		best = node
-		best_distance = distance
-	return best
+	return _nearest_melee_target("mineable", "take_pickaxe_hit")
 
 func _nearest_choppable_tree() -> Node3D:
+	return _nearest_melee_target("wood", "take_axe_hit")
+
+func _target_radius(node: Node3D) -> float:
+	# Agac/kaya carpisma silindirinin yaricapi = vurulacak yuzey.
+	for body_name in ["TrunkBody", "RockBody", "CollisionBody"]:
+		var collision := node.get_node_or_null(body_name + "/CollisionShape3D") as CollisionShape3D
+		if collision != null:
+			if collision.shape is CylinderShape3D:
+				return (collision.shape as CylinderShape3D).radius
+			if collision.shape is SphereShape3D:
+				return (collision.shape as SphereShape3D).radius
+			if collision.shape is CapsuleShape3D:
+				return (collision.shape as CapsuleShape3D).radius
+	return 0.4
+
+func _surface_distance(node: Node3D) -> float:
+	var relative := node.global_position - player.global_position
+	relative.y = 0.0
+	return relative.length() - _target_radius(node)
+
+func _nearest_melee_target(resource_type: String, hit_method: String) -> Node3D:
 	var best: Node3D = null
-	var best_distance := CHOP_RANGE
+	var best_distance := MELEE_REACH
 	var forward := Basis(Vector3.UP, yaw) * Vector3.FORWARD
 	for node in resource_nodes:
 		if not is_instance_valid(node) or node.is_queued_for_deletion():
 			continue
-		if String(node.get_meta("resource_type", "")) != "wood" or not node.has_method("take_axe_hit"):
+		if String(node.get_meta("resource_type", "")) != resource_type or not node.has_method(hit_method):
 			continue
 		var relative := node.global_position - player.global_position
 		relative.y = 0.0
-		var distance := relative.length()
-		if distance >= best_distance or distance < 0.001:
+		if relative.length() < 0.001:
 			continue
-		if forward.dot(relative / distance) < 0.22:
+		var distance := _surface_distance(node)
+		if distance > best_distance:
+			continue
+		if forward.dot(relative.normalized()) < MELEE_FACING_DOT:
 			continue
 		best = node
 		best_distance = distance
@@ -603,12 +614,12 @@ func _advance_axe_impact(delta: float) -> void:
 	if not is_instance_valid(target) or target.is_queued_for_deletion():
 		return
 	if target.has_method("take_axe_hit"):
-		if player.global_position.distance_to(target.global_position) > CHOP_RANGE + 0.4:
+		if _surface_distance(target) > MELEE_REACH + 0.3:
 			return
 		if target.take_axe_hit(player.global_position) and target.is_falling:
 			resource_nodes.erase(target)
 	elif target.has_method("take_pickaxe_hit"):
-		if player.global_position.distance_to(target.global_position) > MINE_RANGE + 0.4:
+		if _surface_distance(target) > MELEE_REACH + 0.3:
 			return
 		if target.take_pickaxe_hit(player.global_position) and target.is_depleted:
 			resource_nodes.erase(target)
@@ -725,6 +736,9 @@ func _make_player() -> void:
 			attack_clip = dedicated_axe_clip
 		# Mixamo kliplerinde root bone ileri dogru hareket edebilir.
 		# CharacterBody3D zaten hareket ettigi icin yatay root motion cikarilir.
+		walk_clip_speed = _clip_travel_speed(walk_clip)
+		run_clip_speed = _clip_travel_speed(run_clip)
+		print("Ashvale locomotion: walk clip ", snappedf(walk_clip_speed, 0.01), " m/s, run clip ", snappedf(run_clip_speed, 0.01), " m/s")
 		for selected_clip in [idle_clip, walk_clip, run_clip, attack_clip, jump_clip]:
 			if not selected_clip.is_empty():
 				_remove_horizontal_root_motion(animator.get_animation(selected_clip))
@@ -746,6 +760,37 @@ func _make_player() -> void:
 		character_animation_status = "Rig yok"
 		push_warning("Ashvale: secilen karakterde Skeleton3D bulunamadi. Kol/bacak animasyonu icin rig gerekli.")
 	print("Ashvale character: ", loaded_character_path, " | skeleton: ", skeleton != null, " | clips: ", idle_clip, "/", walk_clip, "/", run_clip, "/", jump_clip, "/", attack_clip, "/", death_clip)
+
+func _clip_travel_speed(clip_name: String) -> float:
+	# Mixamo "In Place" olmayan kliplerde kalca ileri gider; bu mesafe/sure
+	# animasyonun dogal yurume hizidir (iskelet olcegiyle metreye cevrilir).
+	if clip_name.is_empty() or animator == null or skeleton == null:
+		return 0.0
+	var animation: Animation = animator.get_animation(clip_name)
+	if animation == null or animation.length <= 0.0:
+		return 0.0
+	for track_index in range(animation.get_track_count()):
+		if animation.track_get_type(track_index) != Animation.TYPE_POSITION_3D:
+			continue
+		if not String(animation.track_get_path(track_index).get_concatenated_subnames()).to_lower().ends_with("hips"):
+			continue
+		var start: Vector3 = animation.position_track_interpolate(track_index, 0.0)
+		var finish: Vector3 = animation.position_track_interpolate(track_index, animation.length)
+		var travel := Vector2(finish.x - start.x, finish.z - start.z).length()
+		var unit_scale := skeleton.global_transform.basis.get_scale().x
+		return travel * unit_scale / animation.length
+	return 0.0
+
+func _locomotion_playback_speed(target: String, sprinting: bool) -> float:
+	# Animasyon hizi = hareket hizi / klibin kendi hizi -> ayak kaymasi yok.
+	if target == walk_clip and walk_clip_speed > 0.1:
+		return clampf(WALK_SPEED / walk_clip_speed, 0.6, 2.0)
+	if target == run_clip:
+		var move_speed := RUN_SPEED if sprinting else WALK_SPEED
+		if run_clip_speed > 0.1:
+			return clampf(move_speed / run_clip_speed, 0.4, 2.0)
+		return 1.0 if sprinting else 0.65
+	return 1.0
 
 func _flatten_upward_root_motion(animation: Animation) -> void:
 	# Ziplama yuksekligini fizik (CharacterBody3D) uretir. Klipteki kalca
@@ -1064,7 +1109,7 @@ func _update_character_animation(delta: float, moving: bool, sprinting: bool) ->
 		if not target.is_empty():
 			if animator.current_animation != target or not animator.is_playing():
 				animator.play(target, 0.15)
-			animator.speed_scale = (1.0 if sprinting else 0.65) if target == run_clip else 1.0
+			animator.speed_scale = _locomotion_playback_speed(target, sprinting)
 		elif animator.is_playing():
 			animator.stop()
 	if target.is_empty():
@@ -1331,17 +1376,15 @@ func _physics_process(delta: float) -> void:
 		float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
 		float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W))
 	).normalized()
+	if is_dead or attack_remaining > 0.0:
+		# Olurken ve balta/kazma savrulurken oyuncu yerinde kalir.
+		input = Vector2.ZERO
 	var direction := Basis(Vector3.UP, yaw) * Vector3(input.x, 0, input.y)
 	var sprint := Input.is_physical_key_pressed(KEY_SHIFT) and stamina > 1.0 and input.length_squared() > 0.01
 	stamina = clampf(stamina + (-22.0 if sprint else 16.0) * delta, 0.0, 100.0)
 	var speed := RUN_SPEED if sprint else WALK_SPEED
 	player.velocity.x = direction.x * speed
 	player.velocity.z = direction.z * speed
-	if is_dead:
-		input = Vector2.ZERO
-		direction = Vector3.ZERO
-		player.velocity.x = 0.0
-		player.velocity.z = 0.0
 	if not player.is_on_floor():
 		player.velocity.y -= GRAVITY * delta
 	elif jump_phase.is_empty() and not is_dead and attack_remaining <= 0.0 and Input.is_physical_key_pressed(KEY_SPACE):
