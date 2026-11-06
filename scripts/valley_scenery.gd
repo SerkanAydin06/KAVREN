@@ -2,8 +2,8 @@ extends Node3D
 
 # Decorative scenery uses vertex colors, with one draw batch for the flowers.
 func _ready() -> void:
-	_make_ridgeline(360.0, 56.0, Color("#72a6a8"))
-	_make_ridgeline(405.0, 84.0, Color("#899fb9"))
+	_make_ridgeline(465.0, 77.0, Color("#72a6a8"))
+	_make_ridgeline(510.0, 105.0, Color("#899fb9"))
 	_make_wildflowers()
 
 func _color_material() -> StandardMaterial3D:
@@ -37,7 +37,9 @@ func _make_ridgeline(radius: float, height: float, tint: Color) -> void:
 	surface.generate_normals()
 	var ridge := MeshInstance3D.new()
 	ridge.mesh = surface.commit()
-	ridge.material_override = _color_material()
+	var distant_color := _color_material()
+	distant_color.disable_fog = true
+	ridge.material_override = distant_color
 	ridge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(ridge)
 

@@ -919,6 +919,7 @@ func _make_player() -> void:
 
 	character.name = "CharacterModel"
 	visuals.add_child(character)
+	_style_character(character)
 	var bounds := _measure_model_bounds(character)
 	if bounds.size.y > 0.01:
 		var factor := clampf(MODEL_HEIGHT / bounds.size.y, 0.01, 20.0)
@@ -1000,6 +1001,26 @@ func _make_player() -> void:
 		character_animation_status = "Rig yok"
 		push_warning("Ashvale: secilen karakterde Skeleton3D bulunamadi. Kol/bacak animasyonu icin rig gerekli.")
 	print("Ashvale character: ", loaded_character_path, " | skeleton: ", skeleton != null, " | clips: ", idle_clip, "/", walk_clip, "/", run_clip, "/", jump_clip, "/", attack_clip, "/", death_clip)
+
+func _style_character(character: Node3D) -> void:
+	# Work on material copies so all original skin, hair transparency and rig data survive.
+	var materials := {}
+	for child in character.find_children("*", "MeshInstance3D", true, false):
+		var body := child as MeshInstance3D
+		if body.mesh == null:
+			continue
+		for surface in range(body.mesh.get_surface_count()):
+			var original := body.get_active_material(surface) as StandardMaterial3D
+			if original == null:
+				continue
+			if not materials.has(original):
+				var painted := original.duplicate() as StandardMaterial3D
+				painted.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+				painted.specular_mode = BaseMaterial3D.SPECULAR_TOON
+				painted.normal_scale *= 0.3
+				painted.roughness = maxf(0.78, painted.roughness)
+				materials[original] = painted
+			body.set_surface_override_material(surface, materials[original])
 
 func _clip_travel_speed(clip_name: String) -> float:
 	# Mixamo "In Place" olmayan kliplerde kalca ileri gider; bu mesafe/sure
