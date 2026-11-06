@@ -24,9 +24,10 @@ Godot **4.7.x** (önerilen: 4.7.2) ile oluşturulmuş, üçüncü şahıs keşif
 | Fare | Kamera |
 | Fare tekerleği | Kamera uzaklığı |
 | Shift | Koş (dayanıklılık tüketir) |
-| Space | Zıpla |
+| Space | Zıpla (Jump.fbx animasyonuyla) |
 | Sol tık | Seçili aletle vur: balta ağaç keser, kazma kaya/cevher kırar |
 | 1 / 2 | Balta / Kazma seç |
+| R | Öldükten sonra kampta yeniden doğ |
 | E | Yerdeki odun, taş, bakır veya demir parçasını topla |
 | Esc | Fareyi serbest bırak / yakala |
 | F11 | Tam ekran / pencere |
@@ -222,3 +223,11 @@ Char1 FBX iskelet/modeli genellikle santimetre ölçeğiyle geliyor. Oyuncu mode
 - Meshy modellerinde sap, sınır kutusunun merkezinde değil (balta başı sapın bir yanına taşıyor). `scripts/main.gd` içindeki `TOOL_GRIPS` her aletin sap kaymasını (`handle_x`), tutuş yüksekliğini (`grip_height`) ve ağız yönünü (`blade_sign`) tutuyor.
 - `scripts/hand_grip.gd` (`SkeletonModifier3D`): hangi animasyon oynarsa oynasın sağ eldeki parmakları sapın etrafında yumruk yapar. Kıvrılma açıları dosyanın başındaki tablolardan ayarlanabilir.
 - İnce ayar için: kavrama noktası `GRIP_ALONG_PALM` (avuç boyunca) ve `GRIP_PALM_OFFSET` (avuçtan uzaklık, metre) sabitleriyle kaydırılabilir.
+
+## Zıplama ve ölme animasyonları — 2026-11-06
+
+- `Char1/Jump.fbx` → `Ashvale/Jump`. Space'e basınca klip çömelmenin sonundan (0.62 sn) başlar, 0.16 sn sonra fiziksel kalkış olur. Klipteki havada kalma süresi fizikteki uçuş süresine eşitlenir (0.825× hız). Klipteki kalça yükselmesi silinir (yüksekliği fizik verir), çömelme ve iniş dalgası kalır. İnişten sonra hareket edilirse hemen yürüyüşe/koşuya geçilir. Kenardan düşerken zıplama klibinin düşüş pozu kullanılır.
+- `Char1/Dying Backwards.fbx` → `Ashvale/Death`. Basit can sistemi eklendi: HUD'da **CAN**. Kamp ateşinin içinde durmak saniyede 34 can yakar; 4 sn hasar almazsan can yavaşça dolar. Can bitince karakter geriye düşerek ölür, kontroller kilitlenir, **R** ile kampta yeniden doğarsın.
+- Zıplarken ve ölüyken balta/kazma savrulmaz.
+- Test: `tests/movement_diagnostics.gd` (CI'de çalışır).
+- Godot editörünün eski `assets/obje` yollarına ürettiği artık dosyalar (253 MB doku kopyası ve `.import`) silindi; klasör `.gitignore`'a eklendi. Bilgisayarındaki Godot'ta bu klasör tekrar oluşursa silebilirsin.

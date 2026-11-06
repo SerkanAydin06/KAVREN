@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://co2hkjryrfgyw"
-path="res://.godot/imported/Meshy_AI_Stylized_fantasy_survival_RPG_iron_ore_20261105_texture.fbx-6f7e069a562124b266361e0505eae4e2.scn"
+uid="uid://crx7dw438feah"
+path="res://.godot/imported/Dying Backwards.fbx-c9371977883000a8eb79655e256124e2.scn"
 
 [deps]
 
-source_file="res://assets/obje/Meshy_AI_Stylized_fantasy_survival_RPG_iron_ore_20261105_texture_fbx/Meshy_AI_Stylized_fantasy_survival_RPG_iron_ore_20261105_texture.fbx"
-dest_files=["res://.godot/imported/Meshy_AI_Stylized_fantasy_survival_RPG_iron_ore_20261105_texture.fbx-6f7e069a562124b266361e0505eae4e2.scn"]
+source_file="res://assets/characters/Char1/Dying Backwards.fbx"
+dest_files=["res://.godot/imported/Dying Backwards.fbx-c9371977883000a8eb79655e256124e2.scn"]
 
 [params]
 

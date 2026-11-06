@@ -51,6 +51,8 @@ jobs:
           grep -F "Ashvale animation imported: Idle" godot-smoke.log
           grep -F "Ashvale animation imported: Run" godot-smoke.log
           grep -F "Ashvale animation imported: Attack" godot-smoke.log
+          grep -F "Ashvale animation imported: Jump" godot-smoke.log
+          grep -F "Ashvale animation imported: Death" godot-smoke.log
           grep -F "Ashvale style preview: stylized tree + rock added" godot-smoke.log
           grep -F "Ashvale mineables:" godot-smoke.log
           grep -F "Ashvale equipped tools: mount=mixamorig_RightHand axe=hand_axe pickaxe=true" godot-smoke.log
@@ -142,3 +144,14 @@ jobs:
             exit 1
           fi
           grep -E "AshvalePropsTest mineables=.*failures=0" godot-props.log
+
+      - name: Validate jump timing, campfire damage, death and respawn
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 150s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/movement_diagnostics.gd 2>&1 | tee godot-movement.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-movement.log; then
+            echo "Movement validation reported errors"
+            exit 1
+          fi
+          grep -E "AshvaleMoveTest .*failures=0" godot-movement.log

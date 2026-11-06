@@ -3,3 +3,5 @@
 *.bak
 .DS_Store
 .lfs-assets-id
+# Eski Meshy klasoru (artik assets/environment ve assets/tools kullaniliyor).
+assets/obje/
