@@ -102,10 +102,36 @@ static func tree_visual(painted := false) -> Node3D:
 			cluster.scale *= Vector3(1.28, 0.87, 1.08)
 			cluster.material_override = _ink(leaf_colors[index], true)
 	if painted:
+		_leaf_sprays(tree)
 		for part in tree.get_children():
-			if part is MeshInstance3D and not String(part.name).begins_with("Foliage"):
+			if part is MeshInstance3D and part.name != "LeafSprays" and not String(part.name).begins_with("Foliage"):
 				part.material_override = _ink(BARK_LIGHT if String(part.name).begins_with("Branch") else BARK)
 	return tree
+
+# A few tapered leaf silhouettes interrupt the round crowns. All sprays use one mesh.
+static func _leaf_sprays(tree: Node3D) -> void:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in range(13):
+		var angle := i * TAU / 13.0
+		var outward := Vector3(cos(angle), 0, sin(angle))
+		var tangent := Vector3(-outward.z, 0, outward.x)
+		var base := Vector3(-0.48, 5.45 + 0.30 * sin(3.0 * angle), 0) + Vector3(2.2 * outward.x, 0, 1.55 * outward.z)
+		for j in range(3):
+			var along := outward.rotated(Vector3.UP, (j - 1) * 0.46)
+			var root := base + along * 0.06
+			var middle := root + along * 0.30 + Vector3.UP * 0.09
+			var tip := root + along * (0.66 + 0.17 * cos(i + j)) - Vector3.UP * 0.19
+			var tint := LEAF_LIGHT if (i+j) % 3 == 0 else LEAF_MED
+			_triangle(surface, root, middle + tangent * 0.12, tip, tint)
+			_triangle(surface, root, tip, middle - tangent * 0.12, tint.darkened(0.12))
+	surface.generate_normals()
+	var sprays := MeshInstance3D.new()
+	sprays.name = "LeafSprays"
+	sprays.mesh = surface.commit()
+	sprays.material_override = _ink(Color.WHITE, false, true)
+	sprays.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	tree.add_child(sprays)
 
 static func _ink(tint: Color, leaves := false, facets := false) -> ShaderMaterial:
 	var mat := ShaderMaterial.new()
