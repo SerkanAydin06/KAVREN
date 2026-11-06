@@ -88,7 +88,10 @@ const TREE_TEXTURE_PATHS := [
 ]
 const TREE_NAMES := ["Oak", "Pine", "Birch", "Elder"]
 const TREE_HEIGHTS := [8.0, 10.0, 8.7, 7.0]
-const TREE_TRUNK_RADII := [0.62, 0.40, 0.37, 0.55]
+# Bel hizasindaki (~1 m) gorunen govde yaricapi, metre (Meshy mesh olcumu).
+const TREE_TRUNK_RADII := [0.78, 0.5, 0.36, 0.85]
+# Kok uclari topraga girsin diye model, boyunun bu orani kadar gomulur.
+const TREE_ROOT_SINK := [0.045, 0.04, 0.045, 0.055]
 const TREE_COUNT := 24
 # Kazma ile kirilan kaynaklar: model, kaynak turu, yukseklik, vurus, parca sayisi.
 const ROCK_TYPES := {
@@ -300,6 +303,7 @@ func _make_camp() -> void:
 					var offset_x := bounds.position.x + bounds.size.x * 0.5
 					var offset_z := bounds.position.z + bounds.size.z * 0.5
 					model_node.position = Vector3(-offset_x, -bounds.position.y, -offset_z) * uniform_scale
+					model_node.position.y -= tree_height * float(TREE_ROOT_SINK[kind])
 				if MODEL_LIBRARY.apply_material(model_node, String(TREE_MODEL_KEYS[kind])) == 0:
 					_ensure_tree_texture(model_node, String(TREE_TEXTURE_PATHS[kind]))
 			else:

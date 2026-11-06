@@ -53,6 +53,16 @@ func _run() -> void:
 			failures += 1
 		if hit < 2 and original.is_falling:
 			failures += 1
+	# Tek bir centik her darbede derinlesir; gövde yuzeyinde ve bel hizasinda.
+	var notch: MeshInstance3D = original.get_node_or_null("ChopNotch")
+	if notch == null or notch.mesh == null or original.find_children("CutMark*", "", true, false).size() > 0:
+		failures += 1
+	else:
+		var notch_local: Vector3 = original.to_local(notch.global_position)
+		var radial := Vector2(notch_local.x, notch_local.z).length()
+		if absf(notch_local.y - original.CHOP_HEIGHT) > 0.05 or radial < 0.1 or radial > 1.7 or notch.notch_depth <= 0.0:
+			failures += 1
+		print("AshvaleChopTest notch height=", snappedf(notch_local.y, 0.01), " radius=", snappedf(radial, 0.01), " depth=", snappedf(notch.notch_depth, 0.01))
 	if not original.is_falling or original.get_meta("resource_type") != "spent_tree":
 		failures += 1
 	if game.resource_nodes.has(original):

@@ -13,6 +13,12 @@ const CUT_WOOD := Color("#d6ad74")
 const SPLINTER := Color("#b27d4f")
 const MODEL_LIBRARY := preload("res://scripts/model_library.gd")
 const STUMP_HEIGHT := 0.75
+const CHOP_NOTCH_SCRIPT := preload("res://scripts/chop_notch.gd")
+# Balta darbesinin yerden yuksekligi (oyuncunun bel hizasi).
+const CHOP_HEIGHT := 0.95
+
+static var _triangle_cache: Dictionary = {}
+var _notch: MeshInstance3D = null
 
 var hits_taken: int = 0
 var is_falling: bool = false
@@ -30,8 +36,9 @@ func take_axe_hit(attacker_world_position: Vector3) -> bool:
 		towards_attacker = Vector3.FORWARD
 	towards_attacker = towards_attacker.normalized()
 	hits_taken += 1
-	_create_cut_mark(towards_attacker)
-	_emit_splinters(towards_attacker)
+	var impact := _find_impact(towards_attacker)
+	_update_notch(impact)
+	_emit_splinters(impact)
 	if hits_taken >= MAX_HITS:
 		_begin_fall(-towards_attacker)
 	else:
@@ -42,41 +49,96 @@ func take_axe_hit(attacker_world_position: Vector3) -> bool:
 		wobble.tween_property(self, "rotation:z", base_angle, 0.09)
 	return true
 
-func _create_cut_mark(towards_attacker: Vector3) -> void:
-	var facing_local := global_transform.basis.inverse() * towards_attacker
-	facing_local.y = 0.0
-	facing_local = facing_local.normalized()
-	var notch := Node3D.new()
-	notch.name = "CutMark_%d" % hits_taken
-	notch.position = Vector3(0, 1.12 + float(hits_taken - 1) * 0.16, 0)
-	notch.rotation.y = atan2(facing_local.x, facing_local.z)
-	add_child(notch)
-	var wound := MeshInstance3D.new()
-	var cut := BoxMesh.new()
-	cut.size = Vector3(0.43 + float(hits_taken) * 0.05, 0.115, 0.055)
-	wound.mesh = cut
-	wound.position = Vector3(0, 0, 0.62)
-	wound.material_override = _material(CUT_WOOD)
-	notch.add_child(wound)
+# Darbe noktasi: oyuncudan govde eksenine yatay isin, agacin GERCEK mesh
+# yuzeyine. Mesh verisi yoksa (headless) carpisma silindiri kullanilir.
+func _find_impact(towards_attacker: Vector3) -> Dictionary:
+	var axis := global_position + Vector3(0, CHOP_HEIGHT, 0)
+	var origin := axis + towards_attacker * 4.0
+	var direction := -towards_attacker
+	var best := {}
+	var best_distance := INF
+	for node in find_children("*", "MeshInstance3D", true, false):
+		var mesh_node := node as MeshInstance3D
+		if mesh_node.mesh == null or mesh_node is CHOP_NOTCH_SCRIPT or String(mesh_node.name).begins_with("Chop"):
+			continue
+		var triangles := _triangle_mesh(mesh_node.mesh)
+		if triangles == null:
+			continue
+		var to_local := mesh_node.global_transform.affine_inverse()
+		var hit: Dictionary = triangles.intersect_ray(to_local * origin, (to_local.basis * direction).normalized())
+		if hit.is_empty():
+			continue
+		var world_point: Vector3 = mesh_node.global_transform * Vector3(hit["position"])
+		var distance := origin.distance_to(world_point)
+		if distance < best_distance:
+			best_distance = distance
+			var world_normal: Vector3 = (mesh_node.global_transform.basis.inverse().transposed() * Vector3(hit["normal"])).normalized()
+			best = {"point": world_point, "normal": world_normal}
+	if best.is_empty():
+		var radius := 0.5
+		var collision := get_node_or_null("TrunkBody/CollisionShape3D") as CollisionShape3D
+		if collision == null:
+			collision = get_node_or_null("CollisionBody/CollisionShape3D") as CollisionShape3D
+		if collision != null and collision.shape is CylinderShape3D:
+			radius = (collision.shape as CylinderShape3D).radius
+		best = {"point": axis + towards_attacker * radius, "normal": towards_attacker}
+	# Kesik her zaman yatay; yuzey normali sadece yatay yonu duzeltir.
+	var outward: Vector3 = best["normal"]
+	outward.y = 0.0
+	if outward.length_squared() < 0.01 or outward.dot(towards_attacker) < 0.2:
+		outward = towards_attacker
+	best["outward"] = outward.normalized()
+	var radial: Vector3 = Vector3(best["point"]) - axis
+	radial.y = 0.0
+	best["radius"] = clampf(radial.length(), 0.15, 1.6)
+	return best
 
-func _emit_splinters(towards_attacker: Vector3) -> void:
-	for index in range(4):
+static func _triangle_mesh(mesh: Mesh) -> TriangleMesh:
+	var key := mesh.get_instance_id()
+	if _triangle_cache.has(key):
+		return _triangle_cache[key]
+	var triangles: TriangleMesh = null
+	if mesh.get_faces().size() >= 3:
+		triangles = mesh.generate_triangle_mesh()
+	_triangle_cache[key] = triangles
+	return triangles
+
+func _update_notch(impact: Dictionary) -> void:
+	if _notch == null:
+		_notch = CHOP_NOTCH_SCRIPT.new()
+		_notch.name = "ChopNotch"
+		add_child(_notch)
+		_notch.configure(float(impact["radius"]))
+		var outward: Vector3 = impact["outward"]
+		_notch.global_transform = Transform3D(Basis.looking_at(-outward, Vector3.UP), Vector3(impact["point"]))
+	_notch.set_progress(float(hits_taken) / float(MAX_HITS))
+
+func _emit_splinters(impact: Dictionary) -> void:
+	var start: Vector3 = Vector3(impact["point"]) + Vector3(impact["outward"]) * 0.05
+	var outward: Vector3 = impact["outward"]
+	var ground_y := global_position.y + 0.03
+	for index in range(6):
 		var fragment := MeshInstance3D.new()
 		fragment.name = "ChopSplinter"
 		var bit := BoxMesh.new()
-		bit.size = Vector3(0.045, 0.085 + float(index) * 0.028, 0.035)
+		var is_bark := index % 3 == 0
+		bit.size = Vector3(0.03 + 0.01 * (index % 2), 0.07 + float(index) * 0.018, 0.02)
 		fragment.mesh = bit
-		fragment.material_override = _material(SPLINTER)
-		fragment.position = Vector3(0, 1.20, 0) + towards_attacker * 0.60
-		add_child(fragment)
-		var angle := float(index) * TAU / 4.0
-		var side := Vector3(cos(angle), 0, sin(angle))
-		var end_point := fragment.position + side * 0.55 + Vector3(0, 0.13 + float(index % 2) * 0.18, 0)
-		fragment.rotation = Vector3(angle * 0.5, angle, angle * 0.4)
+		fragment.material_override = _material(BARK if is_bark else SPLINTER)
+		get_parent().add_child(fragment)
+		fragment.global_position = start
+		var side := outward.rotated(Vector3.UP, (float(index) - 2.5) * 0.32)
+		var apex := start + side * (0.35 + 0.08 * index) + Vector3(0, 0.18 + 0.05 * (index % 3), 0)
+		var landing := Vector3(apex.x, ground_y, apex.z) + side * 0.25
+		fragment.rotation = Vector3(index * 0.7, index * 1.3, index * 0.4)
 		var flight := create_tween()
-		flight.tween_property(fragment, "position", end_point, 0.24)
-		flight.tween_property(fragment, "position:y", 0.03, 0.21)
-		flight.tween_callback(fragment.queue_free)
+		flight.set_parallel(true)
+		flight.tween_property(fragment, "global_position", apex, 0.16).set_ease(Tween.EASE_OUT)
+		flight.tween_property(fragment, "rotation", fragment.rotation + Vector3(4.0, 2.0, 3.0), 0.5)
+		flight.chain().tween_property(fragment, "global_position", landing, 0.26).set_ease(Tween.EASE_IN)
+		flight.chain().tween_interval(1.4)
+		flight.chain().tween_property(fragment, "scale", Vector3.ONE * 0.01, 0.3)
+		flight.chain().tween_callback(fragment.queue_free)
 
 func _begin_fall(fall_world_direction: Vector3) -> void:
 	is_falling = true
