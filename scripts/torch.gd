@@ -23,22 +23,22 @@ func _ready() -> void:
 	wood.roughness = 0.9
 	stick.material_override = wood
 	add_child(stick)
-	var wrap := MeshInstance3D.new()
-	wrap.name = "Wrap"
+	var cloth_wrap := MeshInstance3D.new()
+	cloth_wrap.name = "Wrap"
 	var cloth := CylinderMesh.new()
 	cloth.radial_segments = 8
 	cloth.top_radius = 0.04
 	cloth.bottom_radius = 0.032
 	cloth.height = 0.12
-	wrap.mesh = cloth
-	wrap.position.y = 0.4
+	cloth_wrap.mesh = cloth
+	cloth_wrap.position.y = 0.4
 	var cloth_mat := StandardMaterial3D.new()
 	cloth_mat.albedo_color = Color("#3a2b20")
 	cloth_mat.emission_enabled = true
 	cloth_mat.emission = Color(1.0, 0.35, 0.08)
 	cloth_mat.emission_energy_multiplier = 1.2
-	wrap.material_override = cloth_mat
-	add_child(wrap)
+	cloth_wrap.material_override = cloth_mat
+	add_child(cloth_wrap)
 
 	var flame := GPUParticles3D.new()
 	flame.name = "Flame"

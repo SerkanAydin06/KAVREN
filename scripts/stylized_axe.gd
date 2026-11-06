@@ -14,12 +14,12 @@ func _ready() -> void:
 	handle.height = 0.84
 	_add_part("Handle", handle, Vector3(0, -0.07, 0), GRIP)
 	for index in range(4):
-		var wrap := CylinderMesh.new()
-		wrap.radial_segments = 8
-		wrap.top_radius = 0.047
-		wrap.bottom_radius = 0.047
-		wrap.height = 0.027
-		_add_part("GripWrap_%d" % index, wrap, Vector3(0, -0.31 + float(index) * 0.07, 0), GRIP_DARK)
+		var grip_band := CylinderMesh.new()
+		grip_band.radial_segments = 8
+		grip_band.top_radius = 0.047
+		grip_band.bottom_radius = 0.047
+		grip_band.height = 0.027
+		_add_part("GripWrap_%d" % index, grip_band, Vector3(0, -0.31 + float(index) * 0.07, 0), GRIP_DARK)
 	# Belirgin, yelpaze bicimli metal balta basligi, alttaki kesici kenar
 	# siluetini kucuk ekranda da koruyacak sekilde orta buyuklukte.
 	_add_part("AxeHead", _blade_mesh(), Vector3.ZERO, METAL)

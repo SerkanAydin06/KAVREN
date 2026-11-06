@@ -123,9 +123,9 @@ static func instantiate(key: String, target_size: float, fit_longest := false) -
 	model.set_meta("model_key", key)
 	apply_material(model, key)
 	var bounds := measure_bounds(model)
-	var reference := bounds.get_longest_axis_size() if fit_longest else bounds.size.y
-	if reference > 0.0001:
-		var uniform := target_size / reference
+	var source_extent := bounds.get_longest_axis_size() if fit_longest else bounds.size.y
+	if source_extent > 0.0001:
+		var uniform := target_size / source_extent
 		model.scale = Vector3.ONE * uniform
 		var center := bounds.get_center()
 		model.position = Vector3(-center.x, -bounds.position.y, -center.z) * uniform
@@ -149,7 +149,7 @@ static func triangle_count(model_root: Node) -> int:
 			for surface_index in range(mesh.get_surface_count()):
 				var indices: int = mesh.surface_get_array_index_len(surface_index)
 				var vertices: int = mesh.surface_get_array_len(surface_index)
-				total += (indices if indices > 0 else vertices) / 3
+				total += floori((indices if indices > 0 else vertices) / 3.0)
 	return total
 
 static func _all_nodes(root_node: Node) -> Array[Node]:

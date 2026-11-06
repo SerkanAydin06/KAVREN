@@ -93,20 +93,20 @@ func _build_logs() -> void:
 	glow.emission_energy_multiplier = 2.5
 	for i in range(4):
 		var angle := float(i) * TAU / 4.0 + 0.4
-		var log := MeshInstance3D.new()
-		log.name = "Log_%d" % i
+		var firewood := MeshInstance3D.new()
+		firewood.name = "Log_%d" % i
 		var cylinder := CylinderMesh.new()
 		cylinder.radial_segments = 8
 		cylinder.top_radius = 0.07
 		cylinder.bottom_radius = 0.09
 		cylinder.height = 0.95
-		log.mesh = cylinder
-		log.material_override = log_mat
+		firewood.mesh = cylinder
+		firewood.material_override = log_mat
 		# Kutukler ortada birbirine dayanir (tipi atesi).
-		log.position = Vector3(cos(angle) * 0.22, 0.28, sin(angle) * 0.22)
-		log.rotation = Vector3(0, -angle, 0)
-		log.rotate_object_local(Vector3.FORWARD, deg_to_rad(52))
-		add_child(log)
+		firewood.position = Vector3(cos(angle) * 0.22, 0.28, sin(angle) * 0.22)
+		firewood.rotation = Vector3(0, -angle, 0)
+		firewood.rotate_object_local(Vector3.FORWARD, deg_to_rad(52))
+		add_child(firewood)
 	var coals := MeshInstance3D.new()
 	coals.name = "Coals"
 	var bed := SphereMesh.new()
@@ -117,7 +117,7 @@ func _build_logs() -> void:
 	coals.material_override = glow
 	add_child(coals)
 
-func _particle_material(color_ramp: Gradient, additive: bool) -> StandardMaterial3D:
+func _particle_material(additive: bool) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -150,7 +150,7 @@ func _emitter(node_name: String, amount: int, lifetime: float, quad_size: float,
 	particles.visibility_aabb = AABB(Vector3(-2, -0.5, -2), Vector3(4, 6, 4))
 	var quad := QuadMesh.new()
 	quad.size = Vector2(quad_size, quad_size)
-	quad.material = _particle_material(color_ramp, additive)
+	quad.material = _particle_material(additive)
 	particles.draw_pass_1 = quad
 	var process := ParticleProcessMaterial.new()
 	var ramp := GradientTexture1D.new()

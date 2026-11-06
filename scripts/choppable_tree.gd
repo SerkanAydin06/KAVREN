@@ -69,8 +69,8 @@ func _find_impact(towards_attacker: Vector3) -> Dictionary:
 		var triangles := _triangle_mesh(mesh_node.mesh)
 		if triangles == null:
 			continue
-		var to_local := mesh_node.global_transform.affine_inverse()
-		var hit: Dictionary = triangles.intersect_ray(to_local * origin, (to_local.basis * direction).normalized())
+		var world_to_mesh := mesh_node.global_transform.affine_inverse()
+		var hit: Dictionary = triangles.intersect_ray(world_to_mesh * origin, (world_to_mesh.basis * direction).normalized())
 		if hit.is_empty():
 			continue
 		var world_point: Vector3 = mesh_node.global_transform * Vector3(hit["position"])
@@ -183,14 +183,14 @@ func _make_wood_piece(index: int) -> Node3D:
 	pickup.name = "WoodPickup_%d" % index
 	pickup.set_meta("resource_type", "wood_drop")
 	pickup.set_meta("wood_amount", 1)
-	var log := CylinderMesh.new()
-	log.radial_segments = 7
-	log.height = 0.76
-	log.top_radius = 0.19
-	log.bottom_radius = 0.21
+	var log_mesh := CylinderMesh.new()
+	log_mesh.radial_segments = 7
+	log_mesh.height = 0.76
+	log_mesh.top_radius = 0.19
+	log_mesh.bottom_radius = 0.21
 	var cylinder := MeshInstance3D.new()
 	cylinder.name = "SplitLog"
-	cylinder.mesh = log
+	cylinder.mesh = log_mesh
 	cylinder.rotation.z = PI * 0.5
 	cylinder.material_override = _material(BARK)
 	pickup.add_child(cylinder)
