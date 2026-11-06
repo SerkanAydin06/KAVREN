@@ -451,7 +451,7 @@ func _refresh_interface() -> void:
 		goal = "Filizik'i antrenmanla seviye 2 yap" if levels[0]<2 else "Sarmaşık kapıya git · F ile Filizik'e yardım et"
 	if discovered:
 		goal = "Çiçekli açıklık keşfedildi!"
-	journal.text = "ASHVALE · YOLDAŞLAR VADİSİ\n"+goal
+	journal.text = "FİLİZYA · YOLDAŞLAR VADİSİ\n"+goal
 	var team := "Ekibin henüz boş"
 	if not roster.is_empty():
 		team = "Yoldaş · "+COMPANION.SPECIES[active_species].name+"  Sv."+str(levels[active_species])+"  Deneyim "+str(experience[active_species])+"/"+str(levels[active_species]*10)
@@ -480,6 +480,16 @@ static func _number(value: Variant) -> bool:
 	return (value is int or value is float) and is_finite(float(value))
 
 func _load_progress() -> void:
+	# Application names select a new user directory. Copy the existing adventure once.
+	if not FileAccess.file_exists(STATE_PATH):
+		var previous_folder := OS.get_user_data_dir().get_base_dir().path_join("Ashvale - Survival RPG Prototype")
+		var previous_save := previous_folder.path_join("ashvale-companions-v1.json")
+		if FileAccess.file_exists(previous_save):
+			var migrated := DirAccess.copy_absolute(previous_save, ProjectSettings.globalize_path(STATE_PATH))
+			if migrated != OK:
+				progress_writable = false
+				note = "Önceki kayıt aktarılamadı."
+				return
 	if not FileAccess.file_exists(STATE_PATH):
 		return
 	progress_writable = false

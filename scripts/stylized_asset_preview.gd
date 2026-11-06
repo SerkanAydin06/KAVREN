@@ -204,7 +204,9 @@ static func rock_visual(mossy: bool, painted := false) -> Node3D:
 	var main_stone := MeshInstance3D.new()
 	main_stone.name = "FacetedRock"
 	main_stone.mesh = _rock_mesh(1.54, 1.55, 0.75)
-	var facet_material: Material = _ink(Color.WHITE, false, true) if painted else stone_material
+	var facet_material: Material = stone_material
+	if painted:
+		facet_material = _ink(Color.WHITE, false, true)
 	main_stone.material_override = facet_material
 	rock.add_child(main_stone)
 	for index in range(2):
