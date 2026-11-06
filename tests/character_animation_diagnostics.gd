@@ -114,5 +114,8 @@ func _run() -> void:
 				var check: Vector3 = tested_animation.track_get_key_value(index, key_index)
 				if absf(check.x - reference.x) > 0.001 or absf(check.z - reference.z) > 0.001:
 					clip_failures += 1
+	var scout := game.skeleton.get_node_or_null("ValleyScout") as MeshInstance3D
+	if scout == null or not scout.visible or scout.skin == null or scout.skin.get_bind_count() != game.skeleton.get_bone_count() or scout.mesh.get_surface_count() != 1:
+		clip_failures += 1
 	print("AshvaleAnimTest failures=", clip_failures)
 	quit(1 if clip_failures > 0 else 0)

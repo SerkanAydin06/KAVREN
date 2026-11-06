@@ -860,7 +860,6 @@ func _make_player() -> void:
 
 	character.name = "CharacterModel"
 	visuals.add_child(character)
-	_style_character(character)
 	var bounds := _measure_model_bounds(character)
 	if bounds.size.y > 0.01:
 		var factor := clampf(MODEL_HEIGHT / bounds.size.y, 0.01, 20.0)
@@ -869,6 +868,11 @@ func _make_player() -> void:
 
 	animator = _find_animator(character)
 	skeleton = _find_skeleton(character)
+	var fitted := false
+	if skeleton != null and loaded_character_path.to_lower() == "res://assets/characters/char1/walking.fbx":
+		fitted = preload("res://scripts/valley_scout.gd").new().fit(character, skeleton)
+	if not fitted:
+		_style_character(character)
 	if animator != null:
 		for clip in animator.get_animation_list():
 			var clip_name := String(clip)
