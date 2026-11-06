@@ -32,6 +32,13 @@ func _run() -> void:
 	for i in range(full.SLOT_COUNT):
 		full.add("stone_axe", 1)
 	failures += _check(full.add("wood", 5) == 5, "full inventory rejects")
+	full.slots[0] = {"id": "fiber", "count": 3}
+	full.slots[23] = {"id": "fiber", "count": 50}
+	var before: Array = full.slots.duplicate(true)
+	var full_bag_recipe := ITEMS.recipe_for("rope")
+	failures += _check(not full.can_craft(full_bag_recipe) and not full.craft(full_bag_recipe) and full.slots == before, "full split stacks preserve inputs")
+	full.slots[23]["count"] = 3
+	failures += _check(full.craft(full_bag_recipe) and full.item_at(23) == "rope", "consumed stack frees result slot")
 	# --- tarif ---
 	var crafter: RefCounted = INVENTORY.new()
 	crafter.add("fiber", 3)
@@ -146,5 +153,33 @@ func _run() -> void:
 	var placed: bool = game._place_campfire()
 	failures += _check(placed and game.fire_positions.size() == fires_before + 1 and game.inventory.count("campfire") == 0, "place campfire")
 	failures += _check(game.active_tool == "", "campfire slot emptied")
+	# Exercise durable storage using a separate file, then load into a fresh scene.
+	var save_path := "user://ashvale-test-only.save"
+	iron_rock.take_pickaxe_hit(game.player.global_position, 10)
+	var state: Dictionary = game.SAVE.capture(game)
+	failures += _check(game.SAVE.write_state(state, save_path), "write save")
+	var saved: Dictionary = game.SAVE.read_state(save_path)
+	failures += _check(saved == state, "read save")
+	var restored: Node = load("res://main.tscn").instantiate()
+	root.add_child(restored)
+	restored.set_physics_process(false)
+	if not saved.is_empty():
+		game.SAVE.restore(restored, saved)
+		failures += _check(game.SAVE.capture(restored).spent == saved.spent and not saved.spent.is_empty(), "harvest and remaining drops restored")
+		failures += _check(restored.inventory.slots == game.inventory.slots and restored.fire_positions == game.fire_positions, "inventory and placed fires restored")
+		failures += _check(restored.player.position == game.player.position and restored.selected_slot == game.selected_slot, "player restored")
+	DirAccess.remove_absolute(save_path)
+	game.player.position = Vector3(game.GROUND_SIZE, 1, 0)
+	game._physics_process(0.016)
+	failures += _check(game.player.position.x <= game.WORLD_LIMIT, "terrain boundary")
+	game.player.position = Vector3(0, -10, 0)
+	game._physics_process(0.016)
+	failures += _check(game.player.position.is_equal_approx(game.SPAWN_POSITION), "void recovery")
+	game._toggle_inventory()
+	var select_key := InputEventKey.new()
+	select_key.keycode = KEY_1
+	select_key.pressed = true
+	game._unhandled_input(select_key)
+	failures += _check(game.selected_slot == 4, "bag blocks world shortcut")
 	print("AshvaleInventoryTest wood=", game.wood, " fiber=", game.inventory.count("fiber"), " fires=", game.fire_positions.size(), " failures=", failures)
 	quit(1 if failures > 0 else 0)

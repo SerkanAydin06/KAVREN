@@ -124,30 +124,26 @@ func move(from_index: int, to_index: int) -> void:
 		slots[to_index] = source
 	changed.emit()
 
-func can_craft(recipe: Dictionary) -> bool:
+# Preview and commit use the same back-to-front consumption order.
+func _crafted_slots(recipe: Dictionary) -> Array:
 	if not has_all(recipe["cost"]):
-		return false
-	# Malzemeler harcandiktan sonra sonuc sigmali (yaklasik: ayni turden yer veya bosalacak yuva).
-	return space_for(String(recipe["result"])) >= int(recipe["count"]) or _frees_slot(recipe)
-
-func _frees_slot(recipe: Dictionary) -> bool:
+		return []
+	var preview: RefCounted = get_script().new()
+	preview.slots = slots.duplicate(true)
 	for id in recipe["cost"]:
-		var need := int(recipe["cost"][id])
-		for slot in slots:
-			if slot != null and slot["id"] == id and int(slot["count"]) <= need:
-				return true
-	return false
+		preview.remove(String(id), int(recipe["cost"][id]))
+	if preview.add(String(recipe["result"]), int(recipe["count"])) != 0:
+		return []
+	return preview.slots
+
+func can_craft(recipe: Dictionary) -> bool:
+	return not _crafted_slots(recipe).is_empty()
 
 func craft(recipe: Dictionary) -> bool:
-	if not can_craft(recipe):
+	var result := _crafted_slots(recipe)
+	if result.is_empty():
 		return false
-	for id in recipe["cost"]:
-		remove(String(id), int(recipe["cost"][id]))
-	var leftover := add(String(recipe["result"]), int(recipe["count"]))
-	if leftover > 0:
-		# Beklenmedik dolu envanter: malzemeleri iade et.
-		for id in recipe["cost"]:
-			add(String(id), int(recipe["cost"][id]))
-		remove(String(recipe["result"]), int(recipe["count"]) - leftover)
-		return false
+	slots = result
+	item_added.emit(String(recipe["result"]), int(recipe["count"]))
+	changed.emit()
 	return true

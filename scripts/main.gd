@@ -179,6 +179,13 @@ var equipped_axe: Node3D
 var axe_attachment: Node3D
 var hand_grip: Node
 var atmosphere: Node3D
+const SAVE := preload("res://scripts/session_save.gd")
+const WORLD_LIMIT := GROUND_SIZE * 0.5 - 1.5
+var harvested := {}
+var save_elapsed := 0.0
+var session_active := false
+var writable_session := true
+var checkpoint_pending := false
 
 func _ready() -> void:
 	for entry in STARTING_ITEMS:
@@ -192,6 +199,34 @@ func _ready() -> void:
 	_make_hud()
 	_select_slot(0)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	call_deferred("_open_session")
+
+func _open_session() -> void:
+	# Diagnostics instantiate this scene independently of the player's session.
+	if get_tree().current_scene != self:
+		return
+	session_active = true
+	if FileAccess.file_exists(SAVE.PATH):
+		var data := SAVE.read_state()
+		writable_session = not data.is_empty()
+		if writable_session:
+			SAVE.restore(self, data)
+		else:
+			ui.toast("Kayıt okunamadı. Mevcut dosya korunuyor.")
+
+func _schedule_checkpoint() -> void:
+	if session_active and writable_session and not checkpoint_pending:
+		checkpoint_pending = true
+		call_deferred("_checkpoint")
+
+func _checkpoint() -> void:
+	checkpoint_pending = false
+	if session_active and writable_session and not SAVE.write_state(SAVE.capture(self)):
+		ui.toast("Oyun kaydedilemedi.")
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
+		_checkpoint()
 
 func _make_world() -> void:
 	# Gokyuzu, gun-gece dongusu, gunes/ay, GI, sis: scripts/atmosphere.gd
@@ -230,7 +265,7 @@ func _make_stylized_preview() -> void:
 	add_child(preview)
 	var preview_oak := preview.get_node_or_null("StylizedOak") as Node3D
 	if preview_oak != null:
-		preview_oak.connect("wood_dropped", Callable(self, "_register_drops"))
+		preview_oak.connect("wood_dropped", _register_drops.bind(preview_oak))
 		resource_nodes.append(preview_oak)
 	print("Ashvale style preview: stylized tree + rock added")
 
@@ -307,7 +342,7 @@ func _make_camp() -> void:
 		var tree_pos := Vector3(cos(direction_angle) * distance, 0.0, sin(direction_angle) * distance)
 		var tree := CHOPPABLE_TREE_SCRIPT.new()
 		tree.name = "%s_%02d" % [TREE_NAMES[kind], i]
-		tree.connect("wood_dropped", Callable(self, "_register_drops"))
+		tree.connect("wood_dropped", _register_drops.bind(tree))
 		tree.position = tree_pos
 		tree.rotation.y = tree_random.randf_range(0.0, TAU)
 		add_child(tree)
@@ -413,7 +448,7 @@ func _make_mineables() -> void:
 		rock_body.add_child(rock_collision)
 		rock.set_meta("resource_type", "mineable")
 		rock.set_meta("rock_model", key)
-		rock.connect("resources_dropped", Callable(self, "_register_drops"))
+		rock.connect("resources_dropped", _register_drops.bind(rock))
 		resource_nodes.append(rock)
 	print("Ashvale mineables: ", counts)
 
@@ -474,6 +509,7 @@ func _make_hud() -> void:
 	_update_hud()
 
 func _on_inventory_changed() -> void:
+	_schedule_checkpoint()
 	# Secili yuvadaki esya degistiyse (uretim, surukleme, kurulum) yeniden kusan.
 	if inventory.item_at(selected_slot) != equipped_item:
 		_equip_selected()
@@ -591,9 +627,13 @@ func _nearest_melee_target(resource_type: String, hit_method: String) -> Node3D:
 		best_distance = distance
 	return best
 
-func _register_drops(drops: Array) -> void:
+func _register_drops(drops: Array, source: Node3D) -> void:
+	var path := String(get_path_to(source))
+	harvested[path] = true
+	_schedule_checkpoint()
 	for item in drops:
 		if item is Node3D:
+			item.set_meta("harvest_source", path)
 			resource_nodes.append(item as Node3D)
 
 func _collect_resource() -> void:
@@ -620,13 +660,18 @@ func _harvest_fern() -> void:
 	var fern := _nearest_fern()
 	if fern == null:
 		return
-	if inventory.add("fiber", FERN_FIBER) >= FERN_FIBER:
+	if inventory.space_for("fiber") < FERN_FIBER:
 		if ui != null:
 			ui.toast("Envanter dolu", "", Color(0.95, 0.42, 0.36))
 		return
+	inventory.add("fiber", FERN_FIBER)
+	_regrow_fern(fern, FERN_REGROW_SECONDS)
+
+func _regrow_fern(fern: Node3D, delay: float) -> void:
 	fern.visible = false
+	fern.set_meta("regrow_end", Time.get_ticks_msec() + int(delay * 1000))
 	# Egrelti bir sure sonra yeniden buyur.
-	get_tree().create_timer(FERN_REGROW_SECONDS).timeout.connect(func() -> void:
+	get_tree().create_timer(delay).timeout.connect(func() -> void:
 		if is_instance_valid(fern):
 			fern.scale = Vector3.ONE * 0.2
 			fern.visible = true
@@ -741,6 +786,8 @@ func _update_placement() -> void:
 	mat.albedo_color = Color(0.4, 1.0, 0.5, 0.45) if placement_valid else Color(1.0, 0.35, 0.3, 0.45)
 
 func _placement_clear(spot: Vector3) -> bool:
+	if absf(spot.x) > WORLD_LIMIT or absf(spot.z) > WORLD_LIMIT:
+		return false
 	for fire in fire_positions:
 		if Vector2(fire.x - spot.x, fire.z - spot.z).length() < 2.2:
 			return false
@@ -764,14 +811,17 @@ func _place_campfire() -> bool:
 	var spot := placement_ghost.global_position
 	if not inventory.remove_from_slot(selected_slot, 1):
 		return false
+	_add_placed_fire(spot)
+	if ui != null:
+		ui.toast("Kamp ateşi kuruldu", "campfire")
+	return true
+
+func _add_placed_fire(spot: Vector3) -> void:
 	var fire := CAMPFIRE_SCRIPT.new()
 	fire.name = "PlacedCampfire_%d" % fire_positions.size()
 	add_child(fire)
 	fire.global_position = spot
 	fire_positions.append(spot)
-	if ui != null:
-		ui.toast("Kamp ateşi kuruldu", "campfire")
-	return true
 
 
 func _make_player() -> void:
@@ -1414,8 +1464,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
 		get_viewport().set_input_as_handled()
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_T and atmosphere != null:
-		atmosphere.advance_hours(1.0)
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
 		_respawn()
 	if is_dead:
@@ -1424,8 +1472,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			pitch = clampf(pitch - event.relative.y * 0.003, -0.8, 0.35)
 			camera_pivot.rotation = Vector3(pitch, yaw, 0)
 		return
+	if ui != null and ui.is_open:
+		if event is InputEventKey and event.pressed and not event.echo and event.keycode in [KEY_TAB, KEY_ESCAPE]:
+			_toggle_inventory()
+			get_viewport().set_input_as_handled()
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
+			KEY_T:
+				atmosphere.advance_hours(1.0)
 			KEY_TAB:
 				_toggle_inventory()
 				get_viewport().set_input_as_handled()
@@ -1438,11 +1493,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				_collect_resource()
 			KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6:
 				_select_slot(int(event.keycode - KEY_1))
-	if ui != null and ui.is_open:
-		# Envanter aciksa fare arayuzu kullanir: kamera/saldiri yok.
-		if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-			_toggle_inventory()
-		return
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -1554,7 +1604,8 @@ func _physics_process(delta: float) -> void:
 		float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
 		float(Input.is_physical_key_pressed(KEY_S)) - float(Input.is_physical_key_pressed(KEY_W))
 	).normalized()
-	if is_dead or attack_remaining > 0.0:
+	var inventory_open: bool = ui != null and ui.is_open
+	if inventory_open or is_dead or attack_remaining > 0.0:
 		# Olurken ve balta/kazma savrulurken oyuncu yerinde kalir.
 		input = Vector2.ZERO
 	var direction := Basis(Vector3.UP, yaw) * Vector3(input.x, 0, input.y)
@@ -1565,12 +1616,19 @@ func _physics_process(delta: float) -> void:
 	player.velocity.z = direction.z * speed
 	if not player.is_on_floor():
 		player.velocity.y -= GRAVITY * delta
-	elif jump_phase.is_empty() and not is_dead and attack_remaining <= 0.0 and Input.is_physical_key_pressed(KEY_SPACE):
+	elif not inventory_open and jump_phase.is_empty() and not is_dead and attack_remaining <= 0.0 and Input.is_physical_key_pressed(KEY_SPACE):
 		_begin_jump()
 	elif jump_phase != "air":
 		player.velocity.y = -0.1
 	_advance_jump(delta)
 	player.move_and_slide()
+	var pos := player.global_position
+	if pos.y < -3.0:
+		player.global_position = SPAWN_POSITION
+		player.velocity = Vector3.ZERO
+		jump_phase = ""
+	else:
+		player.global_position = Vector3(clampf(pos.x, -WORLD_LIMIT, WORLD_LIMIT), pos.y, clampf(pos.z, -WORLD_LIMIT, WORLD_LIMIT))
 	_update_health(delta)
 	if direction.length_squared() > 0.01:
 		visuals.rotation.y = lerp_angle(visuals.rotation.y, atan2(direction.x, direction.z) + deg_to_rad(character_facing_offset), delta * 10.0)
@@ -1579,3 +1637,8 @@ func _physics_process(delta: float) -> void:
 	_update_placement()
 	camera_pivot.global_position = camera_pivot.global_position.lerp(player.global_position + Vector3(0, 1.5, 0), minf(delta * 8.0, 1.0))
 	_update_hud()
+	if session_active:
+		save_elapsed += delta
+		if save_elapsed >= 30.0:
+			save_elapsed = 0.0
+			_checkpoint()
