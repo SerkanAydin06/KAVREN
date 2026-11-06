@@ -1,9 +1,9 @@
 extends Node3D
 
 const SPECIES := [
-	{"name": "Filizik", "color": Color("#78bb79"), "accent": Color("#c7ed88"), "move": "Yaprak Pıtırtısı", "power": 7},
-	{"name": "Damlup", "color": Color("#6ec9df"), "accent": Color("#c4eff6"), "move": "Su Halkası", "power": 6},
-	{"name": "Çakılcık", "color": Color("#c99385"), "accent": Color("#f4d394"), "move": "Çakıl Taklası", "power": 8},
+	{"name": "Filizik", "color": Color("#78bb79"), "accent": Color("#c7ed88"), "move": "Yaprak Kesiği", "power": 7},
+	{"name": "Damlup", "color": Color("#6ec9df"), "accent": Color("#c4eff6"), "move": "Basınç Dalgası", "power": 6},
+	{"name": "Çakılcık", "color": Color("#c99385"), "accent": Color("#f4d394"), "move": "Fay Darbesi", "power": 8},
 ]
 var species := 0
 var bonded := false

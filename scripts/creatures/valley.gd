@@ -373,9 +373,50 @@ func _strike(actor: Node3D, defender: Node3D) -> void:
 	travel.y = 0.0
 	var motion := actor.create_tween()
 	motion.tween_property(actor,"position",start-travel.normalized()*0.24,0.13)
-	motion.tween_property(actor,"position",start+travel.normalized()*maxf(0.1,travel.length()-0.95),0.18)
+	var contact := start+travel.normalized()*maxf(0.1,travel.length()-0.95)
+	if actor.species == 2:
+		motion.tween_property(actor,"position",start+Vector3.UP*0.72,0.19)
+	motion.tween_property(actor,"position",contact,0.18)
+	motion.tween_callback(_impact.bind(actor,defender))
 	motion.tween_property(actor,"position",start,0.23)
 	await motion.finished
+
+func _impact(actor: Node3D, defender: Node3D) -> void:
+	var center := defender.position + Vector3.UP*0.65
+	var direction := (defender.position-actor.position).normalized()
+	var tint: Color = COMPANION.SPECIES[actor.species].accent
+	for i in range(5):
+		var angle := TAU*i/5.0
+		var burst := MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		sphere.radial_segments = 8
+		sphere.rings = 3
+		burst.mesh = sphere
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = tint
+		burst.material_override = mat
+		burst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(burst)
+		burst.position = center
+		var spread := Vector3(cos(angle),sin(angle),0.1)
+		match actor.species:
+			0:
+				burst.scale = Vector3(0.40,0.065,0.12)
+				burst.rotation.z = angle
+			1:
+				burst.scale = Vector3(0.16,0.24,0.16)
+			2:
+				burst.scale = Vector3(0.20,0.14,0.19)
+		var flash := burst.create_tween()
+		flash.set_parallel(true)
+		flash.tween_property(burst,"position",center+spread*0.85+direction*0.45,0.25)
+		flash.tween_property(burst,"scale",Vector3.ONE*0.015,0.25)
+		flash.chain().tween_callback(burst.queue_free)
+	var recoil := defender.create_tween()
+	var initial := defender.visual.rotation.y
+	recoil.tween_property(defender.visual,"rotation:y",initial+0.24,0.06)
+	recoil.tween_property(defender.visual,"rotation:y",initial,0.15)
 
 func _battle_action(guard: bool) -> void:
 	if battle < 0 or resolving:
@@ -532,7 +573,8 @@ func _refresh_interface() -> void:
 	if battle >= 0:
 		prompt.text = ""
 		combat_card.show()
-		var threat := "AĞIR VURUŞ" if (turn_count+1)%3 == 0 else "Saldırı"
+		var shown_turn := turn_count if resolving else turn_count+1
+		var threat := "AĞIR VURUŞ" if shown_turn%3 == 0 else "Saldırı"
 		combat_text.text = "%s  %d   /   %s  %d\nRakibin niyeti · %s\n[1] %s     [2] Savun     [Esc] Çekil" % [COMPANION.SPECIES[active_species].name,friend_energy,COMPANION.SPECIES[battle].name,maxi(0,rival_energy),threat,COMPANION.SPECIES[active_species].move]
 	else:
 		prompt.text = "[E] "+COMPANION.SPECIES[_nearest_creature()].name+" ile tanış" if _nearest_creature()>=0 else ""
