@@ -51,6 +51,12 @@ Godot **4.7.x** (önerilen: 4.7.2) ile oluşturulmuş, üçüncü şahıs keşif
 - **Otomatik kayıt:** Eşya değişikliklerinde, tamamlanan hasatta, 30 saniyede bir ve normal pencere kapanışında kaydedilir. Sonraki açılışta aynı konum, çanta, saat, kamp ateşleri, tüketilmiş ağaç/kayalar, yerde kalan parçalar ve liflerin büyüme süreleri geri yüklenir.
 - Envanter açıkken hareket, zıplama ve dünya etkileşimleri durur. Oyuncu arazinin kenarında durur, zeminin altına düşerse başlangıç noktasına döner.
 
+## İlk gece
+
+Oyun 08:30’da başlar. 17:00’den sonra hava serinler, 19:30’da gece başlar. Şafak 05:30’da gelir. Meşale keşif için ışık sağlar. Isınmak için yanan bir ateşin 5 metre yakınına gel, alevin içine basmaktan kaçın. Vücut sıcaklığı gece sıfıra inerse can azalır.
+
+Kamp ateşi 150 saniyelik yakıtla başlar. Yaklaş ve **E** ile 1 odun ekle. Her odun 75 saniye yanar. Sönen ateşi aynı şekilde yeniden yakabilirsin. Geceyi hayatta tamamladığında şafakta bildirim görünür. Yakıt, vücut sıcaklığı ve ilk gece ilerlemesi otomatik kayda dahildir.
+
 ## Henüz bulunmayan sistemler
 
 Savaş, düşman yapay zekâsı, açlık ve susuzluk.
@@ -267,7 +273,7 @@ Char1 FBX iskelet/modeli genellikle santimetre ölçeğiyle geliyor. Oyuncu mode
 
 **Atmosfer** (`scripts/atmosphere.gd`):
 - Kendi gökyüzü shader'ı: saate göre gökyüzü ve ufuk rengi, gün batımında güneş tarafında turuncu ufuk, güneş diski ve halesi, ay, gece yanıp sönen yıldızlar, rüzgârla kayan iki katmanlı prosedürel bulutlar. Bulutluluk birkaç dakikada bir yavaşça değişir.
-- Gün-gece döngüsü: 1 oyun günü = 24 gerçek dakika (`day_length_minutes`), oyun 08:30'da başlar. Gün 05:30–19:30. Güneş/ay yönü, ışık rengi ve şiddeti saate göre değişir; HUD'da **SAAT** gösterilir, **T** ile 1 saat ileri sarılır.
+- Gün-gece döngüsü: 1 oyun günü = 10 gerçek dakika (`day_length_minutes`), oyun 08:30'da başlar. Gün 05:30–19:30. Güneş/ay yönü, ışık rengi ve şiddeti saate göre değişir; HUD'da **SAAT** gösterilir, **T** ile 1 saat ileri sarılır.
 - Işık: SDFGI (dolaylı ışık), SSIL, SSAO (temas gölgeleri), yumuşak kenarlı PCSS güneş gölgeleri (4 bölmeli), AgX ton eşleme, glow, hafif renk ayarı.
 - Hava: mesafe sisi + hava perspektifi, güneş ışınlı hacimsel sis; sabah 04:00–09:30 arası sis yoğunlaşır, öğleye doğru açılır.
 

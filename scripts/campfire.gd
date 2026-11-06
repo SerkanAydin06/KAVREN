@@ -7,6 +7,19 @@ const STONE := Color("#6f706b")
 const LOG := Color("#3d2a1c")
 const CHAR := Color("#1d1512")
 
+const WOOD_SECONDS := 75.0
+const MAX_FUEL := WOOD_SECONDS * 4
+var fuel := WOOD_SECONDS * 2
+
+func set_fuel(seconds: float) -> void:
+	fuel = clampf(seconds, 0, MAX_FUEL)
+	if light != null and light.visible != (fuel > 0):
+		light.visible = fuel > 0
+		for child in get_children():
+			if child is GPUParticles3D:
+				child.emitting = light.visible
+				child.visible = light.visible
+
 var light: OmniLight3D
 var _flicker := FastNoiseLite.new()
 var _time := 0.0
@@ -29,6 +42,9 @@ func _ready() -> void:
 	add_child(light)
 
 func _process(delta: float) -> void:
+	if fuel <= 0:
+		return
+	set_fuel(fuel - delta)
 	_time += delta
 	var n := _flicker.get_noise_1d(_time * 10.0)
 	light.light_energy = 2.6 + n * 0.9

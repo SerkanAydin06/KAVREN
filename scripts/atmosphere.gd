@@ -6,7 +6,7 @@ extends Node3D
 
 signal hour_changed(hour: float)
 
-@export var day_length_minutes := 24.0 # gercek dakikada bir tam gun
+@export var day_length_minutes := 10.0 # gercek dakikada bir tam gun
 @export_range(0.0, 24.0, 0.25) var start_hour := 8.5
 @export var time_flows := true
 

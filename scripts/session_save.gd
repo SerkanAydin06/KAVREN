@@ -5,6 +5,9 @@ const INVENTORY := preload("res://scripts/inventory.gd")
 const ITEMS := preload("res://scripts/items.gd")
 
 static func capture(game: Node) -> Dictionary:
+	var fuel: Array[float] = []
+	for fire in game.campfires:
+		fuel.append(fire.fuel)
 	var spent := {}
 	var ferns := {}
 	for path in game.harvested:
@@ -22,6 +25,8 @@ static func capture(game: Node) -> Dictionary:
 		"selected": game.selected_slot, "position": game.player.global_position,
 		"yaw": game.yaw, "pitch": game.pitch, "health": game.health,
 		"stamina": game.stamina, "hour": game.atmosphere.hour,
+		"survival": {"fuel": fuel, "warmth": game.warmth, "night_started": game.night_started,
+			"night_failed": game.night_failed, "survived": game.survived_first_night},
 		"fires": game.fire_positions.slice(1), "spent": spent, "ferns": ferns,
 	}
 
@@ -73,6 +78,18 @@ static func read_state(path := PATH) -> Dictionary:
 		for point in data.spent[path_key]:
 			if not _valid_point(point):
 				return {}
+	if data.has("survival"):
+		var survival: Variant = data.survival
+		if not survival is Dictionary or not survival.get("fuel") is Array or survival.fuel.size() != data.fires.size() + 1:
+			return {}
+		for seconds in survival.fuel:
+			if not seconds is float or not is_finite(seconds) or seconds < 0:
+				return {}
+		if not survival.get("warmth") is float or not is_finite(survival.warmth):
+			return {}
+		for key in ["night_started", "night_failed", "survived"]:
+			if not survival.get(key) is bool:
+				return {}
 	return data
 
 static func _valid_point(value: Variant) -> bool:
@@ -91,6 +108,14 @@ static func restore(game: Node, data: Dictionary) -> void:
 	game.atmosphere.set_hour(data.hour)
 	for spot in data.fires:
 		game._add_placed_fire(spot)
+	if data.has("survival"):
+		var survival: Dictionary = data.survival
+		for index in range(game.campfires.size()):
+			game.campfires[index].set_fuel(survival.fuel[index])
+		game.warmth = clampf(survival.warmth, 0, 100)
+		game.night_started = survival.night_started
+		game.night_failed = survival.night_failed
+		game.survived_first_night = survival.survived
 	# Match only resource nodes in this fresh world, including the showcase oak.
 	for source in game.resource_nodes.duplicate():
 		var key: String = str(game.get_path_to(source))

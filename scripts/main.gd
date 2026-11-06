@@ -168,6 +168,11 @@ var ui: CanvasLayer
 var torch: Node3D
 var placement_ghost: Node3D
 var placement_valid := false
+var campfires: Array[Node3D] = []
+var warmth := 100.0
+var night_started := false
+var survived_first_night := false
+var night_failed := false
 var fire_positions: Array[Vector3] = [CAMP_POSITION]
 var _tool_materials: Dictionary = {}
 var equipped_pickaxe: Node3D
@@ -395,6 +400,7 @@ func _make_camp() -> void:
 	var fire := CAMPFIRE_SCRIPT.new()
 	fire.name = "Campfire"
 	camp.add_child(fire)
+	campfires.append(fire)
 
 func _make_mineables() -> void:
 	# Kampa yakin taslar, daha uzakta bakir ve demir cevheri damarlari.
@@ -521,6 +527,7 @@ func _update_hud() -> void:
 	var nearby := _nearest_resource()
 	var fern := _nearest_fern()
 	var power := ITEMS.tool_power(equipped_item)
+	var fire := _closest_fire(3.0)
 	if is_dead:
 		hint = "ÖLDÜN  —  [R] kampta yeniden doğ"
 	elif burning:
@@ -530,6 +537,8 @@ func _update_hud() -> void:
 		hint = "[E]  %s topla" % ITEMS.display_name(kind)
 	elif fern != null:
 		hint = "[E]  Bitki lifi topla"
+	elif fire != null:
+		hint = "[E] Odun ekle  ·  %d sn yakıt" % ceili(fire.fuel) if fire.fuel > 0 else "[E] Ateşi yak  ·  1 odun"
 	elif active_tool == "axe":
 		var tree := _nearest_choppable_tree()
 		if tree != null:
@@ -550,8 +559,15 @@ func _update_hud() -> void:
 		hint = "[SOL TIK]  Kamp ateşini kur" if placement_valid else "Buraya kurulamaz"
 	ui.set_hint(hint)
 	ui.set_status(health, MAX_HEALTH, stamina)
+	var goal := ""
+	if not survived_first_night:
+		if night_started:
+			goal = "Gün doğana kadar sıcak kal." if not night_failed else "Bir sonraki geceye hazırlan."
+		else:
+			goal = "Akşam olmadan odun biriktir." if atmosphere.hour < 17 else "Hava soğuyor. Ateşe odun ekle."
+	ui.set_survival(warmth, goal)
 	if atmosphere != null:
-		ui.set_clock(atmosphere.clock_text(), atmosphere.is_night())
+		ui.set_clock(atmosphere.clock_text(), _night_now())
 	ui.set_debug("KARAKTER  %s  |  %s\nANİMASYON  %s\nPOZİSYON  %s\nFPS  %d" % [loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status, current_animation_state, str(player.global_position.snapped(Vector3.ONE * 0.1)), Engine.get_frames_per_second()])
 
 func _nearest_fern() -> Node3D:
@@ -822,6 +838,7 @@ func _add_placed_fire(spot: Vector3) -> void:
 	add_child(fire)
 	fire.global_position = spot
 	fire_positions.append(spot)
+	campfires.append(fire)
 
 
 func _make_player() -> void:
@@ -1490,7 +1507,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_F3:
 				ui.toggle_debug()
 			KEY_E:
-				_collect_resource()
+				var fire := _closest_fire(3.0)
+				if fire != null and _nearest_resource() == null and _nearest_fern() == null:
+					_refuel(fire)
+				else:
+					_collect_resource()
 			KEY_1, KEY_2, KEY_3, KEY_4, KEY_5, KEY_6:
 				_select_slot(int(event.keycode - KEY_1))
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
@@ -1543,16 +1564,56 @@ func _advance_jump(delta: float) -> void:
 				if animator != null and animator.current_animation == jump_clip:
 					animator.seek(maxf(animator.current_animation_position, JUMP_CLIP_LANDING), true)
 
+func _closest_fire(radius: float, lit_only := false) -> Node3D:
+	var closest: Node3D
+	for fire in campfires:
+		var distance := fire.global_position.distance_to(player.global_position)
+		if distance <= radius and (not lit_only or fire.fuel > 0):
+			radius = distance
+			closest = fire
+	return closest
+
+func _refuel(fire: Node3D) -> void:
+	if fire.fuel > fire.MAX_FUEL - fire.WOOD_SECONDS:
+		ui.toast("Ateşte bir odunluk yer yok.")
+	elif inventory.remove("wood", 1):
+		fire.set_fuel(fire.fuel + fire.WOOD_SECONDS)
+		ui.toast("Ateşe odun eklendi.", "wood")
+	else:
+		ui.toast("Ateşi beslemek için 1 odun gerekli.")
+
+func _night_now() -> bool:
+	return atmosphere.hour >= atmosphere.SUNSET_HOUR or atmosphere.hour < atmosphere.SUNRISE_HOUR
+
+func _advance_survival(delta: float) -> void:
+	var night := _night_now()
+	if night != night_started:
+		night_started = night
+		if night:
+			night_failed = is_dead
+		elif not night_failed and not is_dead and not survived_first_night:
+			survived_first_night = true
+			ui.toast("İlk geceyi atlattın!")
+		_schedule_checkpoint()
+	if is_dead:
+		return
+	var warming := _closest_fire(5.0, true) != null
+	var evening: bool = atmosphere.hour >= 17.0 and not night
+	if warming:
+		warmth = minf(100, warmth + delta * 2.0)
+	elif night:
+		warmth = maxf(0, warmth - delta * 0.8)
+	elif evening:
+		warmth = move_toward(warmth, 55, delta * 0.25)
+	else:
+		warmth = minf(100, warmth + delta)
+	if night and warmth <= 0 and not warming:
+		_take_damage(delta * 1.5)
+
 func _update_health(delta: float) -> void:
 	if is_dead:
 		return
-	burning = false
-	for fire in fire_positions:
-		var to_fire := player.global_position - fire
-		to_fire.y = 0.0
-		if to_fire.length() < FIRE_RADIUS:
-			burning = true
-			break
+	burning = _closest_fire(FIRE_RADIUS, true) != null
 	if burning:
 		_take_damage(FIRE_DAMAGE_PER_SECOND * delta)
 	else:
@@ -1569,6 +1630,9 @@ func _take_damage(amount: float) -> void:
 		_die()
 
 func _die() -> void:
+	if _night_now():
+		night_failed = true
+	_schedule_checkpoint()
 	is_dead = true
 	burning = false
 	jump_phase = ""
@@ -1587,6 +1651,8 @@ func _respawn() -> void:
 	if not is_dead:
 		return
 	is_dead = false
+	warmth = 100.0
+	_schedule_checkpoint()
 	health = MAX_HEALTH
 	stamina = 100.0
 	time_since_damage = 99.0
@@ -1629,6 +1695,7 @@ func _physics_process(delta: float) -> void:
 		jump_phase = ""
 	else:
 		player.global_position = Vector3(clampf(pos.x, -WORLD_LIMIT, WORLD_LIMIT), pos.y, clampf(pos.z, -WORLD_LIMIT, WORLD_LIMIT))
+	_advance_survival(delta)
 	_update_health(delta)
 	if direction.length_squared() > 0.01:
 		visuals.rotation.y = lerp_angle(visuals.rotation.y, atan2(direction.x, direction.z) + deg_to_rad(character_facing_offset), delta * 10.0)
