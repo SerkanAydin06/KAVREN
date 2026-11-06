@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://crcwjfe5ygeko"
-path="res://.godot/imported/Meshy_AI_Stylized_fantasy_survival_RPG_mossy_20261105_texture.fbx-29526e82f12e313a1c1c19155b48c00b.scn"
+uid="uid://cks7bulef6i4k"
+path="res://.godot/imported/Jump.fbx-f3e41be3d1da8ea4f7e5c08c5426eb72.scn"
 
 [deps]
 
-source_file="res://assets/obje/Meshy_AI_Stylized_fantasy_survival_RPG_mossy_20261105_texture_fbx/Meshy_AI_Stylized_fantasy_survival_RPG_mossy_20261105_texture.fbx"
-dest_files=["res://.godot/imported/Meshy_AI_Stylized_fantasy_survival_RPG_mossy_20261105_texture.fbx-29526e82f12e313a1c1c19155b48c00b.scn"]
+source_file="res://assets/characters/Char1/Jump.fbx"
+dest_files=["res://.godot/imported/Jump.fbx-f3e41be3d1da8ea4f7e5c08c5426eb72.scn"]
 
 [params]
 

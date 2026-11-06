@@ -5,6 +5,8 @@ const CHAR1_IDLE_PATH := "res://assets/characters/Char1/Idle.fbx"
 const CHAR1_WALK_ANIMATION_PATH := "res://assets/characters/Char1/Walking_Animated.fbx"
 const CHAR1_RUNNING_PATH := "res://assets/characters/Char1/Running.fbx"
 const CHAR1_ATTACK_PATH := "res://assets/characters/Char1/Standing Melee Attack Downward.fbx"
+const CHAR1_JUMP_PATH := "res://assets/characters/Char1/Jump.fbx"
+const CHAR1_DEATH_PATH := "res://assets/characters/Char1/Dying Backwards.fbx"
 const PRIORITY_CHARACTER_FILES := [
 	"res://assets/characters/Char1/Walking.fbx",
 	"res://assets/characters/char1.glb",
@@ -36,6 +38,24 @@ const AXE_SCRIPT := preload("res://scripts/stylized_axe.gd")
 const MODEL_LIBRARY := preload("res://scripts/model_library.gd")
 const MINEABLE_ROCK_SCRIPT := preload("res://scripts/mineable_rock.gd")
 const MINE_RANGE := 3.0
+# Jump.fbx (2.17 sn) zaman cizelgesi: 0.20-0.55 comelme, ~0.75 kalkis,
+# 1.05 tepe, ~1.30 inis, 1.45 inis comelmesi, 1.75 toparlanma.
+const JUMP_VELOCITY := 6.0
+const JUMP_CLIP_START := 0.62 # comelmenin sonundan basla: tus gecikmesi kisa kalsin
+const JUMP_CLIP_TAKEOFF := 0.75
+const JUMP_CLIP_LANDING := 1.30
+const JUMP_CLIP_RECOVERED := 1.75
+# Klipteki havada kalma suresini fizikteki ucus suresine (2v/g) esitle.
+const JUMP_PLAYBACK_SPEED := (JUMP_CLIP_LANDING - JUMP_CLIP_TAKEOFF) / (2.0 * JUMP_VELOCITY / GRAVITY)
+const JUMP_TAKEOFF_DELAY := (JUMP_CLIP_TAKEOFF - JUMP_CLIP_START) / JUMP_PLAYBACK_SPEED
+# Can ve kamp atesi.
+const MAX_HEALTH := 100.0
+const FIRE_DAMAGE_PER_SECOND := 34.0
+const FIRE_RADIUS := 0.95
+const HEALTH_REGEN_PER_SECOND := 3.0
+const HEALTH_REGEN_DELAY := 4.0
+const CAMP_POSITION := Vector3(3, 0, 2)
+const SPAWN_POSITION := Vector3(0, 0.1, 0)
 const HAND_GRIP_SCRIPT := preload("res://scripts/hand_grip.gd")
 # Meshy aletlerinin sap konumu (model boyuna oranla). handle_x: sapin
 # sinir kutusu merkezine gore X kaymasi; grip_height: tutus yuksekligi;
@@ -90,6 +110,13 @@ var idle_clip := ""
 var jump_clip := ""
 var fall_clip := ""
 var attack_clip := ""
+var death_clip := ""
+var jump_phase := "" # "", "crouch", "air", "land"
+var jump_timer := 0.0
+var health := MAX_HEALTH
+var is_dead := false
+var time_since_damage := 99.0
+var burning := false
 var attack_remaining := 0.0
 var loaded_character_path := ""
 var character_animation_status := "bekleniyor"
@@ -296,7 +323,7 @@ func _make_camp() -> void:
 	_make_decor_stumps()
 	var camp := Node3D.new()
 	camp.name = "Camp"
-	camp.position = Vector3(3, 0, 2)
+	camp.position = CAMP_POSITION
 	add_child(camp)
 	var pit := CylinderMesh.new()
 	pit.top_radius = 0.85
@@ -458,7 +485,7 @@ func _make_hud() -> void:
 	controls.add_theme_color_override("font_shadow_color", Color.BLACK)
 	controls.add_theme_constant_override("shadow_offset_x", 2)
 	controls.add_theme_constant_override("shadow_offset_y", 2)
-	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Topla    1  Balta    2  Kazma\nFARE  Kamera / Zoom    SOL TIK  Kes / Kaz    ESC  İmleç    F11  Tam Ekran"
+	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Topla    1  Balta    2  Kazma    R  Yeniden Doğ\nFARE  Kamera / Zoom    SOL TIK  Kes / Kaz    ESC  İmleç    F11  Tam Ekran"
 	controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(controls)
 	_update_hud()
@@ -481,7 +508,11 @@ func _update_hud() -> void:
 			hint = "\n[SOL TIK] %s KAZ (%d/%d)" % [RESOURCE_LABELS.get(nearby_rock.resource_kind, "TAŞ"), nearby_rock.hits_taken, nearby_rock.max_hits]
 		elif _nearest_choppable_tree() != null:
 			hint = "\n[1] Ağacı kesmek için BALTA'ya geç"
-	hud.text = "ASHVALE  •  KEŞİF\nODUN  %d    TAŞ  %d    BAKIR  %d    DEMİR  %d\nALET  %s    DAYANIKLILIK  %d%%%s\nKARAKTER  %s  |  %s\nANİMASYON  %s" % [wood, stone, copper, iron, TOOL_LABELS[active_tool], int(stamina), hint, loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status, current_animation_state]
+	if is_dead:
+		hint = "\nÖLDÜN  —  [R] kampta yeniden doğ"
+	elif burning:
+		hint = "\nATEŞ YAKIYOR! Uzaklaş"
+	hud.text = "ASHVALE  •  KEŞİF\nCAN  %d    ODUN  %d    TAŞ  %d    BAKIR  %d    DEMİR  %d\nALET  %s    DAYANIKLILIK  %d%%%s\nKARAKTER  %s  |  %s\nANİMASYON  %s" % [int(ceilf(health)), wood, stone, copper, iron, TOOL_LABELS[active_tool], int(stamina), hint, loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status, current_animation_state]
 
 func _nearest_resource() -> Node3D:
 	var best: Node3D = null
@@ -597,7 +628,7 @@ func _select_tool(tool_name: String) -> void:
 func _make_player() -> void:
 	player = CharacterBody3D.new()
 	player.name = "Player"
-	player.position = Vector3(0, 0.1, 0)
+	player.position = SPAWN_POSITION
 	add_child(player)
 	var col := CollisionShape3D.new()
 	var capsule := CapsuleShape3D.new()
@@ -673,6 +704,13 @@ func _make_player() -> void:
 		var imported_walk := _import_external_clip(CHAR1_WALK_ANIMATION_PATH, "Walk", true)
 		var imported_run := _import_external_clip(CHAR1_RUNNING_PATH, "Run", true)
 		var imported_attack := _import_external_clip(CHAR1_ATTACK_PATH, "Attack", false)
+		var imported_jump := _import_external_clip(CHAR1_JUMP_PATH, "Jump", false)
+		var imported_death := _import_external_clip(CHAR1_DEATH_PATH, "Death", false)
+		if not imported_jump.is_empty():
+			jump_clip = imported_jump
+			_flatten_upward_root_motion(animator.get_animation(jump_clip))
+		if not imported_death.is_empty():
+			death_clip = imported_death
 		if not imported_idle.is_empty():
 			idle_clip = imported_idle
 		if not imported_walk.is_empty():
@@ -687,7 +725,7 @@ func _make_player() -> void:
 			attack_clip = dedicated_axe_clip
 		# Mixamo kliplerinde root bone ileri dogru hareket edebilir.
 		# CharacterBody3D zaten hareket ettigi icin yatay root motion cikarilir.
-		for selected_clip in [idle_clip, walk_clip, run_clip, attack_clip]:
+		for selected_clip in [idle_clip, walk_clip, run_clip, attack_clip, jump_clip]:
 			if not selected_clip.is_empty():
 				_remove_horizontal_root_motion(animator.get_animation(selected_clip))
 		if not walk_clip.is_empty():
@@ -707,7 +745,27 @@ func _make_player() -> void:
 	else:
 		character_animation_status = "Rig yok"
 		push_warning("Ashvale: secilen karakterde Skeleton3D bulunamadi. Kol/bacak animasyonu icin rig gerekli.")
-	print("Ashvale character: ", loaded_character_path, " | skeleton: ", skeleton != null, " | clips: ", idle_clip, "/", walk_clip, "/", run_clip, "/", jump_clip, "/", attack_clip)
+	print("Ashvale character: ", loaded_character_path, " | skeleton: ", skeleton != null, " | clips: ", idle_clip, "/", walk_clip, "/", run_clip, "/", jump_clip, "/", attack_clip, "/", death_clip)
+
+func _flatten_upward_root_motion(animation: Animation) -> void:
+	# Ziplama yuksekligini fizik (CharacterBody3D) uretir. Klipteki kalca
+	# yukselmesi kalirsa karakter iki kat ziplar; comelme/inis dususleri kalir.
+	if animation == null:
+		return
+	for track_index in range(animation.get_track_count()):
+		if animation.track_get_type(track_index) != Animation.TYPE_POSITION_3D:
+			continue
+		if not String(animation.track_get_path(track_index).get_concatenated_subnames()).to_lower().ends_with("hips"):
+			continue
+		var key_count := animation.track_get_key_count(track_index)
+		if key_count == 0:
+			continue
+		var standing: Vector3 = animation.track_get_key_value(track_index, 0)
+		for key_index in range(key_count):
+			var value: Vector3 = animation.track_get_key_value(track_index, key_index)
+			if value.y > standing.y:
+				value.y = standing.y
+				animation.track_set_key_value(track_index, key_index, value)
 
 
 
@@ -816,7 +874,7 @@ func _import_external_clip(fbx_path: String, target_name: String, should_loop: b
 
 
 func _start_attack() -> void:
-	if animator == null or attack_clip.is_empty() or attack_remaining > 0.0:
+	if animator == null or attack_clip.is_empty() or attack_remaining > 0.0 or is_dead or not jump_phase.is_empty():
 		return
 	var animation := animator.get_animation(attack_clip)
 	if animation == null:
@@ -947,8 +1005,29 @@ func _animate_procedural(delta: float, moving: bool, sprinting: bool, airborne: 
 
 
 func _update_character_animation(delta: float, moving: bool, sprinting: bool) -> void:
+	if is_dead:
+		current_animation_state = "Death"
+		return
+	if not jump_phase.is_empty() and not jump_clip.is_empty() and animator != null:
+		# Ziplama klibi kendi zamanlamasiyla oynar; inisten sonra hareket
+		# basladiginda veya toparlanma bitince normal animasyona donulur.
+		var clip_time := animator.current_animation_position if animator.current_animation == jump_clip else 0.0
+		if jump_phase == "land" and (moving or clip_time >= JUMP_CLIP_RECOVERED):
+			jump_phase = ""
+		else:
+			current_animation_state = "Jump" if jump_phase != "land" else "Landing"
+			return
 	var airborne := not player.is_on_floor()
 	var target := ""
+	if airborne and not jump_clip.is_empty():
+		# Ziplamadan dusme (kenardan kayma): ziplama klibinin dusus pozu.
+		if animator != null and animator.current_animation != jump_clip:
+			animator.play(jump_clip, 0.2)
+			animator.seek(1.12, true)
+		if animator != null:
+			animator.speed_scale = 0.0
+		current_animation_state = "Fall"
+		return
 	if airborne:
 		if player.velocity.y > 0.0 and not jump_clip.is_empty():
 			target = jump_clip
@@ -1139,6 +1218,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
 		get_viewport().set_input_as_handled()
 		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
+		_respawn()
+	if is_dead:
+		if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+			yaw -= event.relative.x * 0.003
+			pitch = clampf(pitch - event.relative.y * 0.003, -0.8, 0.35)
+			camera_pivot.rotation = Vector3(pitch, yaw, 0)
+		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		_collect_resource()
 	if event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_1 or event.keycode == KEY_2):
@@ -1161,6 +1248,84 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
+func _begin_jump() -> void:
+	if jump_clip.is_empty() or animator == null:
+		# Klip yoksa eski davranis: aninda zipla.
+		player.velocity.y = JUMP_VELOCITY
+		return
+	jump_phase = "crouch"
+	jump_timer = JUMP_TAKEOFF_DELAY
+	animator.play(jump_clip, 0.08)
+	animator.seek(JUMP_CLIP_START, true)
+	animator.speed_scale = JUMP_PLAYBACK_SPEED
+
+func _advance_jump(delta: float) -> void:
+	match jump_phase:
+		"crouch":
+			jump_timer -= delta
+			if jump_timer <= 0.0:
+				player.velocity.y = JUMP_VELOCITY
+				jump_phase = "air"
+				jump_timer = 0.0
+		"air":
+			jump_timer += delta
+			if jump_timer > 0.1 and player.is_on_floor() and player.velocity.y <= 0.0:
+				jump_phase = "land"
+				if animator != null and animator.current_animation == jump_clip:
+					animator.seek(maxf(animator.current_animation_position, JUMP_CLIP_LANDING), true)
+
+func _update_health(delta: float) -> void:
+	if is_dead:
+		return
+	var to_fire := player.global_position - CAMP_POSITION
+	to_fire.y = 0.0
+	burning = to_fire.length() < FIRE_RADIUS
+	if burning:
+		_take_damage(FIRE_DAMAGE_PER_SECOND * delta)
+	else:
+		time_since_damage += delta
+		if time_since_damage > HEALTH_REGEN_DELAY:
+			health = minf(health + HEALTH_REGEN_PER_SECOND * delta, MAX_HEALTH)
+
+func _take_damage(amount: float) -> void:
+	if is_dead or amount <= 0.0:
+		return
+	health = maxf(health - amount, 0.0)
+	time_since_damage = 0.0
+	if health <= 0.0:
+		_die()
+
+func _die() -> void:
+	is_dead = true
+	burning = false
+	jump_phase = ""
+	attack_remaining = 0.0
+	pending_chop_target = null
+	player.velocity = Vector3.ZERO
+	if animator != null and not death_clip.is_empty():
+		animator.speed_scale = 1.0
+		animator.play(death_clip, 0.12)
+	current_animation_state = "Death"
+	print("Ashvale: oyuncu oldu")
+	if hud != null:
+		_update_hud()
+
+func _respawn() -> void:
+	if not is_dead:
+		return
+	is_dead = false
+	health = MAX_HEALTH
+	stamina = 100.0
+	time_since_damage = 99.0
+	player.global_position = SPAWN_POSITION
+	player.velocity = Vector3.ZERO
+	if animator != null and not idle_clip.is_empty():
+		animator.speed_scale = 1.0
+		animator.play(idle_clip, 0.2)
+	current_animation_state = "Idle"
+	if hud != null:
+		_update_hud()
+
 func _physics_process(delta: float) -> void:
 	var input := Vector2(
 		float(Input.is_physical_key_pressed(KEY_D)) - float(Input.is_physical_key_pressed(KEY_A)),
@@ -1172,13 +1337,20 @@ func _physics_process(delta: float) -> void:
 	var speed := RUN_SPEED if sprint else WALK_SPEED
 	player.velocity.x = direction.x * speed
 	player.velocity.z = direction.z * speed
+	if is_dead:
+		input = Vector2.ZERO
+		direction = Vector3.ZERO
+		player.velocity.x = 0.0
+		player.velocity.z = 0.0
 	if not player.is_on_floor():
 		player.velocity.y -= GRAVITY * delta
-	elif Input.is_physical_key_pressed(KEY_SPACE):
-		player.velocity.y = 6.0
-	else:
+	elif jump_phase.is_empty() and not is_dead and attack_remaining <= 0.0 and Input.is_physical_key_pressed(KEY_SPACE):
+		_begin_jump()
+	elif jump_phase != "air":
 		player.velocity.y = -0.1
+	_advance_jump(delta)
 	player.move_and_slide()
+	_update_health(delta)
 	if direction.length_squared() > 0.01:
 		visuals.rotation.y = lerp_angle(visuals.rotation.y, atan2(direction.x, direction.z) + deg_to_rad(character_facing_offset), delta * 10.0)
 	_update_character_animation(delta, input.length_squared() > 0.01, sprint)
