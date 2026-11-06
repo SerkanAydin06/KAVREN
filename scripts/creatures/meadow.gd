@@ -75,20 +75,21 @@ static func populate(world: Node3D) -> void:
 static func _batch(world: Node3D, transforms: Array[Transform3D], herb: bool) -> void:
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var tip_color := Color("#acce75") if herb else Color("#87b65d")
 	for i in range(5):
 		var dir := Vector3(cos(i*2.4),0,sin(i*2.4))
 		var foot := dir*0.14
 		var half_width := Vector3(-dir.z,0,dir.x)*(0.08 if herb else 0.047)
 		var tip := foot+dir*(0.24 if herb else 0.14)+Vector3.UP*(0.37+0.06*sin(i*1.3))
-		for v in [foot-half_width,tip,foot+half_width]:
-			tool.set_color(tip_color if v == tip else Color("#47815b"))
-			tool.set_normal(Vector3.UP)
+		var middle := foot.lerp(tip,0.54) - dir*0.035
+		var left := foot-half_width
+		var right := foot+half_width
+		var mid_left := middle-half_width*0.58
+		var mid_right := middle+half_width*0.58
+		for v: Vector3 in [left,mid_left,right,right,mid_left,mid_right,mid_left,tip,mid_right]:
+			tool.set_color(Color(v.y/tip.y,1.0 if herb else 0.0,0.0))
 			tool.add_vertex(v)
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	material.roughness = 1
+	var material := ShaderMaterial.new()
+	material.shader = preload("res://assets/ground/meadow_grass.gdshader")
 	tool.set_material(material)
 	var batch := MultiMesh.new()
 	batch.transform_format = MultiMesh.TRANSFORM_3D
