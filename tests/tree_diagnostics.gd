@@ -59,6 +59,13 @@ func _run() -> void:
 		seen_species[String(node.get_meta("tree_species", ""))] = true
 		if node.has_node("Model"):
 			real_models += 1
+		# Kokler topraga gomulu: model tabani zeminin altinda olmali.
+		var model_node: Node3D = node.get_node_or_null("Model")
+		var model_bottom := 1.0
+		if model_node != null:
+			model_bottom = model_node.position.y + game._measure_model_bounds(model_node).position.y * model_node.scale.y
+		if model_node != null and model_bottom >= -0.1:
+			total_failures += 1
 		var collision: Node = node.get_node_or_null("TrunkBody/CollisionShape3D")
 		if collision is CollisionShape3D:
 			var collision_shape := collision as CollisionShape3D

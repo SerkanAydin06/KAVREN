@@ -239,3 +239,14 @@ Char1 FBX iskelet/modeli genellikle santimetre ölçeğiyle geliyor. Oyuncu mode
 - Hareket hızları buna göre: yürüme **2.5 m/s** (eskiden 4), koşu **6.5 m/s** (eskiden 7). `WALK_SPEED` / `RUN_SPEED` değiştirilirse animasyon hızı kendiliğinden uyar.
 - Vuruş menzili artık ağaç gövdesinin / kayanın **yüzeyine** göre: en fazla **1 m** (`MELEE_REACH`) ve karakterin önündeki ~60°'lik koni (`MELEE_FACING_DOT`). Eskiden merkeze 3.4 m'den vurulabiliyordu.
 - Balta/kazma savrulurken oyuncu yerinde durur; savurma bitince hareket devam eder.
+
+## Ağaç kökleri ve gerçekçi balta çentiği — 2026-11-06
+
+- Ağaçlar boylarının %4–5.5'i kadar toprağa gömülür (`TREE_ROOT_SINK`); kök uçları artık topraktan çıkıyor, ağaçlar ayaklık üzerinde durmuyor. Çarpışma yarıçapları görünen gövde kalınlığına göre güncellendi (`TREE_TRUNK_RADII`).
+- Eski düz kutu "kesik izi" kaldırıldı. Yerine `scripts/chop_notch.gd`:
+  - Darbe noktası, oyuncudan gövdeye atılan ışının ağacın **gerçek mesh yüzeyine** çarptığı yer (bel hizası, `CHOP_HEIGHT` = 0.95 m). Mesh verisi olmayan headless testlerde çarpışma silindiri kullanılır.
+  - Tek bir V-çentik: alt kesim yatay, üst kesim eğik, uçlara doğru sivrilir ve gövde eğriliğine oturur. Her darbede derinleşir (3. darbede gövde yarıçapının ~%55'i).
+  - Kesik yüzeylerinde gövde eksenine göre hesaplanan **yıllık halkalar**, gölgeli dip çizgisi ve ince kırık kabuk kenarı.
+  - Projede Compatibility renderer olduğu için decal kullanılamıyor; çentik shader'da kendi görüş ışını boyunca kameraya çekilerek kabuğun önünde çizilir, ekranda oyulmuş gibi görünür.
+- Kıymıklar artık darbe noktasından oyuncu tarafına sıçrar, yere düşüp kaybolur (eskiden ağacın dönüşüne göre yanlış taraftan çıkabiliyordu).
+- CI düzeltmesi: karakter animasyon testi oyuncuyu zemine oturtmadan durum geçişlerini sınıyordu ve ara sıra düşüş pozunu görüp kırılıyordu.

@@ -64,6 +64,18 @@ func _run() -> void:
 			clip_failures += 1
 			push_error("AshvaleAnimTest motion not valid: " + clip_name)
 	player_node.stop()
+	# Durum gecislerini zeminde test et: fizik kapali oldugu icin oyuncu ilk
+	# karede havada kalabiliyor ve dusus pozu seciliyordu (kararsiz test).
+	game.player.global_position = Vector3(0, 0.05, 0)
+	for attempt in range(30):
+		await physics_frame
+		game.player.velocity = Vector3(0, -2.0, 0)
+		game.player.move_and_slide()
+		if game.player.is_on_floor():
+			break
+	if not game.player.is_on_floor():
+		clip_failures += 1
+		print("AshvaleAnimTest player could not be grounded")
 	game._update_character_animation(0.016, false, false)
 	var idle_state_ok: bool = player_node.current_animation == game.idle_clip
 	game._update_character_animation(0.016, true, false)
