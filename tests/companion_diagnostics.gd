@@ -67,11 +67,39 @@ func _run() -> void:
 	game._check_habitat()
 	if game.battle >= 0 or game.creatures[0].visible:
 		failures += 1
+	# The journal uses the same purchase gate as combat and the save loader.
+	game.sheet.open_for(0)
+	game.sheet.learn_requested.emit(0,0,1)
+	game.sheet.learn_requested.emit(0,1,0)
+	game.sheet.learn_requested.emit(0,1,0)
+	game.sheet.closed.emit()
+	if game.learned[0] != ["bark"] or game.ally_hp(0) != game.COMPANION.max_hp(0,2)+9:
+		failures += 1
+	for species in range(3):
+		var tree = game.DEVELOPMENT
+		var history := []
+		for rank in range(3):
+			history.append(tree.PATHS[species][0][rank].id)
+		if not tree.valid_history(species,5,history) or tree.valid_history(species,4,history):
+			failures += 1
+		for rank in range(3):
+			history.append(tree.PATHS[species][1][rank].id)
+		if tree.valid_history(species,99,history):
+			failures += 1
+	game.levels[0] = 3
+	game._learn(0,1,1)
+	game._begin_training(2)
+	game.friend_energy = 14
+	await game._battle_action(false,false,1)
+	await game._battle_action(false,false,1)
+	if game.turn_count != 1 or game.rival_energy >= game.COMPANION.max_hp(2,game.wild_level) or game.technique_turn[1] != 5:
+		failures += 1
+	game._finish_encounter()
 	game._checkpoint_creatures()
 	var restored: Node = load("res://creature_valley.tscn").instantiate()
 	root.add_child(restored)
 	restored.set_physics_process(false)
-	if not restored.gate_open or restored.roster != game.roster or restored.levels[0]!=2:
+	if not restored.gate_open or restored.roster != game.roster or restored.levels[0]!=3 or restored.learned != game.learned:
 		failures += 1
 	await physics_frame
 	var ray := PhysicsRayQueryParameters3D.create(Vector3(0,8,-21),Vector3(0,-5,-21))
@@ -82,12 +110,17 @@ func _run() -> void:
 	var previous_folder := OS.get_user_data_dir().get_base_dir().path_join("Filizya")
 	DirAccess.make_dir_recursive_absolute(previous_folder)
 	var previous_save := previous_folder.path_join("ashvale-companions-v1.json")
-	DirAccess.copy_absolute(ProjectSettings.globalize_path(game.STATE_PATH), previous_save)
+	var legacy: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(game.STATE_PATH))
+	legacy.version = 1
+	legacy.erase("development")
+	var legacy_file := FileAccess.open(previous_save,FileAccess.WRITE)
+	legacy_file.store_string(JSON.stringify(legacy))
+	legacy_file.close()
 	DirAccess.remove_absolute(game.STATE_PATH)
 	var migrated: Node = load("res://creature_valley.tscn").instantiate()
 	root.add_child(migrated)
 	migrated.set_physics_process(false)
-	if not migrated.gate_open or migrated.roster != game.roster or migrated.levels[0] != 2:
+	if not migrated.gate_open or migrated.roster != game.roster or migrated.levels[0] != 3 or not migrated.learned[0].is_empty() or migrated.DEVELOPMENT.points(3,migrated.learned[0],0) != 3:
 		failures += 1
 	DirAccess.remove_absolute(previous_save)
 	DirAccess.remove_absolute(game.STATE_PATH)

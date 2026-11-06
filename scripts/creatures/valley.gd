@@ -2,6 +2,11 @@ extends "res://scripts/main.gd"
 
 const COMPANION := preload("res://scripts/creatures/companion.gd")
 const MEADOW := preload("res://scripts/creatures/meadow.gd")
+const DEVELOPMENT := preload("res://scripts/creatures/development.gd")
+const SHEET := preload("res://scripts/creatures/creature_sheet.gd")
+var learned := [[],[],[]]
+var technique_turn := [1,1]
+var sheet: SHEET
 const STATE_PATH := "user://ashvale-companions-v1.json"
 const RADIUS := 60.0
 var creatures: Array[Node3D] = []
@@ -279,6 +284,27 @@ func _make_interface() -> void:
 	prompt.add_theme_color_override("font_outline_color",Color("#183b46"))
 	prompt.add_theme_constant_override("outline_size",6)
 	canvas.add_child(prompt)
+	sheet = SHEET.new()
+	sheet.game = self
+	canvas.add_child(sheet)
+	sheet.learn_requested.connect(_learn)
+	sheet.closed.connect(_close_sheet)
+
+func _learn(species: int, path: int, depth: int) -> void:
+	if battle >= 0 or species not in roster or path not in [0,1] or depth not in [0,1,2]:
+		return
+	if DEVELOPMENT.available(species,levels[species],learned[species],path,depth):
+		learned[species].append(DEVELOPMENT.PATHS[species][path][depth].id)
+		_checkpoint_creatures()
+		sheet.refresh()
+
+func _close_sheet() -> void:
+	sheet.hide()
+	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+func ally_hp(species: int) -> int:
+	return COMPANION.max_hp(species,levels[species]) + DEVELOPMENT.bonus(species,learned[species],"hp")
+
 
 func _strength_meter(row: HBoxContainer, tint: Color) -> ProgressBar:
 	var meter := ProgressBar.new()
@@ -364,6 +390,7 @@ func _begin_training(index: int) -> void:
 	var rival := wild_actor
 	wild_level = clampi(int(levels[active_species])-1,1,99)
 	special_ready_turn = 1
+	technique_turn = [1,1]
 	ally_origin = ally.position
 	ally.position = rival.position + Vector3(-3.2,0,1.2)
 	ally.position.y = height_at(ally.position.x,ally.position.z)
@@ -382,7 +409,7 @@ func _begin_training(index: int) -> void:
 	battle_camera.fov = 49
 	battle_camera.current = true
 	visuals.hide()
-	friend_energy = COMPANION.max_hp(active_species,levels[active_species])
+	friend_energy = ally_hp(active_species)
 	rival_energy = COMPANION.max_hp(index,wild_level)
 	turn_count = 0
 	note = "Rakip mevzi aldı. Hamleni seç."
@@ -502,45 +529,65 @@ func _impact(actor: Node3D, defender: Node3D) -> void:
 	recoil.tween_property(defender.visual,"rotation:y",initial+0.24,0.06)
 	recoil.tween_property(defender.visual,"rotation:y",initial,0.15)
 
-func _battle_action(guard: bool, special := false) -> void:
+func _battle_action(guard: bool, special := false, path := -1) -> void:
 	if battle < 0 or resolving:
 		return
 	if special and (levels[active_species] < COMPANION.SPECIAL_LEVEL or turn_count + 1 < special_ready_turn):
 		return
+	var skill: Dictionary = {}
+	if path >= 0:
+		if path > 1:
+			return
+		skill = DEVELOPMENT.PATHS[active_species][path][1]
+		if skill.id not in learned[active_species] or turn_count+1 < technique_turn[path]:
+			return
+		technique_turn[path] = turn_count+4
 	resolving = true
 	var target := battle
 	var ally: Node3D = creatures[active_species]
 	var rival := wild_actor
 	turn_count += 1
 	var heavy := turn_count % 3 == 0
+	var hp_limit := ally_hp(active_species)
+	var known: Array = learned[active_species]
 	if guard:
-		friend_energy = mini(COMPANION.max_hp(active_species,levels[active_species]),friend_energy+3)
+		friend_energy = mini(hp_limit,friend_energy+3+DEVELOPMENT.bonus(active_species,known,"guard_heal"))
 		note = "Savunma alındı."
+	elif skill.has("shield"):
+		friend_energy = mini(hp_limit,friend_energy+int(skill.get("heal",0)))
+		note = skill.name
 	else:
-		note = COMPANION.SPECIAL[active_species] if special else COMPANION.SPECIES[active_species].move
+		note = str(skill.name) if not skill.is_empty() else (COMPANION.SPECIAL[active_species] if special else COMPANION.SPECIES[active_species].move)
 		if special:
 			special_ready_turn = turn_count + 3
-		await _strike(ally,rival,special)
-		rival_energy -= COMPANION.damage(active_species,levels[active_species],target,special)
+		await _strike(ally,rival,special or not skill.is_empty())
+		var hit := COMPANION.damage(active_species,levels[active_species],target,special)
+		hit += DEVELOPMENT.bonus(active_species,known,"power") + int(skill.get("strike",0))
+		if turn_count == 1:
+			hit += DEVELOPMENT.bonus(active_species,known,"opener")
+		if friend_energy*2 <= hp_limit:
+			hit += DEVELOPMENT.bonus(active_species,known,"last_stand")
+		if rival_energy*2 <= COMPANION.max_hp(target,wild_level):
+			hit += int(skill.get("execute",0))
+		if heavy:
+			hit += int(skill.get("counter",0))
+		friend_energy = mini(hp_limit,friend_energy+roundi(mini(hit,rival_energy)*float(skill.get("drain",0))))
+		friend_energy = maxi(1,friend_energy-int(skill.get("recoil",0)))
+		rival_energy -= hit
 	if rival_energy <= 0:
-		creatures[target].tired = true
-		experience[active_species] += 12
-		# The starter shares field experience, even when another partner is active.
-		if active_species != 0 and roster.has(0) and levels[0]<2:
-			levels[0] = 2
-		while levels[active_species]<99 and experience[active_species] >= levels[active_species]*10:
-			experience[active_species] -= levels[active_species]*10
-			levels[active_species] += 1
-		note = "Karşılaşma kazanıldı. "+COMPANION.SPECIES[active_species].name+" seviye "+str(levels[active_species])+(". E ile ekibine al." if not roster.has(target) else ".")
-		_finish_encounter()
-		_checkpoint_creatures()
+		_win_battle(target)
 		return
 	note = "Rakip ağır vuruşa geçti." if heavy else "Rakip karşılık veriyor."
 	await _strike(rival,ally,heavy and wild_level >= COMPANION.SPECIAL_LEVEL)
 	var incoming := COMPANION.damage(target,wild_level,active_species,heavy and wild_level >= COMPANION.SPECIAL_LEVEL)
 	if heavy:
 		incoming = roundi(incoming*1.4)
-	friend_energy -= 1 if guard else incoming
+	friend_energy = mini(hp_limit,friend_energy+DEVELOPMENT.bonus(active_species,known,"regen"))
+	friend_energy -= 1 if guard else maxi(1,incoming-int(skill.get("shield",0))-DEVELOPMENT.bonus(active_species,known,"armor"))
+	rival_energy -= int(skill.get("reflect",0))
+	if rival_energy <= 0 and friend_energy > 0:
+		_win_battle(target)
+		return
 	if heavy and guard:
 		rival_energy = maxi(1,rival_energy-5)
 	resolving = false
@@ -548,6 +595,19 @@ func _battle_action(guard: bool, special := false) -> void:
 	if friend_energy <= 0:
 		note = "Gücün tükendi. Karşılaşmadan çekildin."
 		_finish_encounter()
+
+func _win_battle(target: int) -> void:
+	creatures[target].tired = true
+	experience[active_species] += 12
+	# The starter shares field experience, even when another partner is active.
+	if active_species != 0 and roster.has(0) and levels[0]<2:
+		levels[0] = 2
+	while levels[active_species]<99 and experience[active_species] >= levels[active_species]*10:
+		experience[active_species] -= levels[active_species]*10
+		levels[active_species] += 1
+	note = "Karşılaşma kazanıldı. "+COMPANION.SPECIES[active_species].name+" seviye "+str(levels[active_species])+(". E ile ekibine al." if not roster.has(target) else ".")
+	_finish_encounter()
+	_checkpoint_creatures()
 
 func _open_path() -> bool:
 	if gate_open or player.position.distance_to(Vector3(0,height_at(0,-33),-33)) > 7:
@@ -567,7 +627,18 @@ func _apply_gate() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if sheet.visible:
+			if event.keycode in [KEY_G,KEY_ESCAPE]:
+				_close_sheet()
+			return
 		match event.keycode:
+			KEY_G:
+				if battle < 0 and not roster.is_empty():
+					sheet.open_for(active_species)
+				elif roster.is_empty():
+					note = "Özelliklerini görmek için önce bir yaratık edin."
+			KEY_4,KEY_5:
+				_battle_action(false,false,event.keycode-KEY_4)
 			KEY_ESCAPE:
 				if resolving:
 					return
@@ -599,12 +670,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		yaw -= event.relative.x*0.003
 		pitch = clampf(pitch-event.relative.y*0.003,-0.65,0.20)
 		camera_pivot.rotation = Vector3(pitch,yaw,0)
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton and event.pressed and not sheet.visible:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _physics_process(delta: float) -> void:
 	var input_vector := Vector2(float(Input.is_physical_key_pressed(KEY_D))-float(Input.is_physical_key_pressed(KEY_A)),float(Input.is_physical_key_pressed(KEY_S))-float(Input.is_physical_key_pressed(KEY_W))).normalized()
-	if battle >= 0:
+	if battle >= 0 or sheet.visible:
 		input_vector = Vector2.ZERO
 	var direction := Basis(Vector3.UP,yaw)*Vector3(input_vector.x,0,input_vector.y)
 	var sprint := Input.is_physical_key_pressed(KEY_SHIFT) and direction.length()>0.1
@@ -612,7 +683,7 @@ func _physics_process(delta: float) -> void:
 	player.velocity.z = direction.z*(RUN_SPEED if sprint else WALK_SPEED)
 	if not player.is_on_floor():
 		player.velocity.y -= GRAVITY*delta
-	elif Input.is_physical_key_pressed(KEY_SPACE) and battle < 0 and jump_phase.is_empty():
+	elif Input.is_physical_key_pressed(KEY_SPACE) and battle < 0 and not sheet.visible and jump_phase.is_empty():
 		_begin_jump()
 	elif jump_phase != "air":
 		player.velocity.y = -0.2
@@ -635,7 +706,8 @@ func _physics_process(delta: float) -> void:
 	camera.position = Vector3(0,1,camera_distance)
 	if not hit.is_empty():
 		camera.position = camera.position.normalized()*maxf(0.2,camera_pivot.position.distance_to(hit.position)-0.2)
-	_check_habitat()
+	if not sheet.visible:
+		_check_habitat()
 	if gate_open and player.position.z < -38 and not discovered:
 		discovered = true
 		note = "Çiçekli açıklık keşfedildi. İlk yolculuğun tamamlandı!"
@@ -647,7 +719,7 @@ func _physics_process(delta: float) -> void:
 		_checkpoint_creatures()
 
 func _refresh_interface() -> void:
-	field_card.visible = battle < 0
+	field_card.visible = battle < 0 and not sheet.visible
 	var goal := "Solundaki otluğu araştır · Filizik’e meyve sun"
 	if roster.has(0):
 		goal = "Filizik ile bir saha karşılaşması kazan" if levels[0]<2 else "Sarmaşık kapıya git · F ile Filizik'e yardım et"
@@ -657,11 +729,13 @@ func _refresh_interface() -> void:
 	var team := "Ekibin henüz boş"
 	if not roster.is_empty():
 		team = "Yoldaş · "+COMPANION.SPECIES[active_species].name+"  Sv."+str(levels[active_species])+"  Deneyim "+str(experience[active_species])+"/"+str(levels[active_species]*10)
-	panel.text = team+"\nMeyve "+str(berries)+"  ·  FPS "+str(Engine.get_frames_per_second())+"\nWASD hareket · Shift koş · Space zıpla · Tab yoldaş · E etkileşim · F sarmaşık\n"+note
+	if not roster.is_empty():
+		team += "  ·  Gelişim puanı %d" % DEVELOPMENT.points(levels[active_species],learned[active_species],active_species)
+	panel.text = team+"\nMeyve "+str(berries)+"  ·  FPS "+str(Engine.get_frames_per_second())+"\nWASD hareket · Shift koş · Space zıpla · Tab yoldaş · E etkileşim · F sarmaşık · G gelişim\n"+note
 	if battle >= 0:
 		prompt.text = ""
 		combat_card.show()
-		ally_meter.max_value = COMPANION.max_hp(active_species,levels[active_species])
+		ally_meter.max_value = ally_hp(active_species)
 		ally_meter.value = friend_energy
 		foe_meter.max_value = COMPANION.max_hp(battle,wild_level)
 		foe_meter.value = maxi(0,rival_energy)
@@ -673,6 +747,12 @@ func _refresh_interface() -> void:
 		var foe_move: String = COMPANION.SPECIAL[battle] if shown_turn%3 == 0 and wild_level >= COMPANION.SPECIAL_LEVEL else foe.move
 		var special_hint := "Sv.2'de açılır" if levels[active_species] < COMPANION.SPECIAL_LEVEL else ("hazır" if shown_turn >= special_ready_turn else "bekle")
 		combat_text.text = "%s · %s Sv.%d  %d can    /    %s · %s Sv.%d  %d can\n%s ×%.1f   ·   Rakip: %s (%s)\n[1] %s    [2] Savun    [3] %s (%s)    [Esc] Çekil" % [info.name,COMPANION.ELEMENT[active_species],levels[active_species],maxi(0,friend_energy),foe.name,COMPANION.ELEMENT[battle],wild_level,maxi(0,rival_energy),COMPANION.ELEMENT[active_species],factor,foe_move,threat,info.move,COMPANION.SPECIAL[active_species],special_hint]
+		for path in range(2):
+			var skill: Dictionary = DEVELOPMENT.PATHS[active_species][path][1]
+			if skill.id in learned[active_species]:
+				var remaining := maxi(0,int(technique_turn[path])-shown_turn)
+				var status := "hazır" if remaining == 0 else "%d tur" % remaining
+				combat_text.text += "   [%d] %s (%s)" % [4+path,skill.name,status]
 
 	else:
 		prompt.text = ""
@@ -680,7 +760,7 @@ func _refresh_interface() -> void:
 func _checkpoint_creatures() -> void:
 	if not progress_writable or get_tree().current_scene != self:
 		return
-	var data := {"version":1,"berries":berries,"roster":roster,"levels":levels,"xp":experience,"trust":creatures[0].trust,"tired":[creatures[0].tired,creatures[1].tired,creatures[2].tired],"active":active_species,"gate":gate_open,"discovered":discovered,"position":[player.position.x,player.position.y,player.position.z]}
+	var data := {"version":2,"development":learned,"berries":berries,"roster":roster,"levels":levels,"xp":experience,"trust":creatures[0].trust,"tired":[creatures[0].tired,creatures[1].tired,creatures[2].tired],"active":active_species,"gate":gate_open,"discovered":discovered,"position":[player.position.x,player.position.y,player.position.z]}
 	var file := FileAccess.open(STATE_PATH+".tmp",FileAccess.WRITE)
 	if file == null:
 		note = "Kayıt dosyası yazılamadı."
@@ -717,7 +797,7 @@ func _load_progress() -> void:
 		return
 	progress_writable = false
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(STATE_PATH))
-	if not data is Dictionary or data.get("version")!=1:
+	if not data is Dictionary or data.get("version") not in [1,2]:
 		note = "Kayıt okunamadı. Önceki kayıt korunuyor."
 		return
 	for key in ["levels","xp","tired","position"]:
@@ -739,6 +819,16 @@ func _load_progress() -> void:
 			return
 	if not data.get("gate") is bool or not data.get("discovered") is bool:
 		return
+	if data.version == 2:
+		var saved: Variant = data.get("development")
+		if not saved is Array or saved.size() != 3:
+			return
+		for i in range(3):
+			if not DEVELOPMENT.valid_history(i,int(data.levels[i]),saved[i]):
+				return
+			if i not in data.roster and not saved[i].is_empty():
+				return
+		learned = saved.duplicate(true)
 	progress_writable = true
 	berries = clampi(int(data.berries),0,12)
 	creatures[0].trust = clampi(int(data.trust),0,2)
