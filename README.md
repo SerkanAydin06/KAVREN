@@ -25,29 +25,95 @@ Godot **4.7.x** (önerilen: 4.7.2) ile oluşturulmuş, üçüncü şahıs keşif
 | Fare tekerleği | Kamera uzaklığı |
 | Shift | Koş (dayanıklılık tüketir) |
 | Space | Zıpla |
-| E | Yakındaki odun veya taşı topla |
+| Sol tık | Seçili aletle vur: balta ağaç keser, kazma kaya/cevher kırar |
+| 1 / 2 | Balta / Kazma seç |
+| E | Yerdeki odun, taş, bakır veya demir parçasını topla |
 | Esc | Fareyi serbest bırak / yakala |
 | F11 | Tam ekran / pencere |
 
 ## Şu anda çalışan sistemler
 
-- Meshy GLB karakteri, mevcut animasyonlardan Running ve varsa Idle seçimi
-- Karakter boyuna göre ilk ölçek düzeltmesi; kapsül çarpışma
-- Üçüncü şahıs takip kamerası ve yakınlaştırma
-- Basit ağaç/taş kaynakları, kaynak toplama ve kaynak sayaçları
-- Koşma dayanıklılığı ve yenilenmesi
-- Ağaç gövdesi ile taşların çarpışmaları
+- Char1 Mixamo karakteri: Idle, Run, yavaşlatılmış Run ile yürüyüş, özel `AxeChop` savurma animasyonu
+- Üçüncü şahıs takip kamerası ve yakınlaştırma, koşma dayanıklılığı
+- **Aletler:** Meshy el baltası ve kazması sağ el kemiğine bağlı; `1`/`2` ile değiştirilir
+- **Ağaç kesme:** 4 Meshy ağaç türünden 24 ağaç, 3 darbede devrilir, yerine Meshy kütüğü kalır, 3 odun düşer
+- **Madencilik:** kazmayla kırılan taş kayalar (3 darbe), yosunlu kayalar (3), bakır cevheri (4), demir cevheri (5); kırılınca parçalar düşer
+- **Toplama:** düşen parçalar `E` ile toplanır; HUD'da ODUN / TAŞ / BAKIR / DEMİR sayaçları ve seçili alet
+- **Dekor:** 36 eğrelti otu (gölgesiz, 40 m sonra gizlenir) ve 5 eski kütük
 - Tam ekranda okunabilir, ekran köşelerine bağlı HUD
 
 ## Henüz bulunmayan sistemler
 
-Envanter, eşya üretimi, savaş, düşman yapay zekâsı, açlık/susuzluk, kayıt/yükleme sistemi. Mevcut Meshy karakterinin skinning/rig sorunları motor koduyla tamamen giderilemez; doğru rig ve ayrı Idle/Walk/Run klipleri önerilir.
+Envanter ekranı, eşya üretimi (crafting), savaş, düşman yapay zekâsı, açlık/susuzluk, kayıt/yükleme sistemi. Gerçek yürüyüş adımları için hareketli bir `Walking_Animated.fbx` hâlâ gerekli.
+
+## Klasör yapısı ve dosya adları
+
+Tüm Meshy objeleri tek bir düzene göre adlandırılır: **klasör adı = model adı**, dokular `<ad>_<kanal>.png`.
+
+```
+assets/
+├── characters/            Char1 (Mixamo) ve yedek karakter
+├── ground/                Zemin dokusu ve shader
+├── environment/
+│   ├── trees/             ancient_oak, emerald_pine, silverleaf_birch, twisted_elder
+│   ├── rocks/             stone_boulder, mossy_boulder
+│   ├── ores/              copper_ore, iron_ore
+│   ├── plants/            fern
+│   └── props/             tree_stump
+└── tools/                 hand_axe, pickaxe
+```
+
+Örnek: `assets/environment/ores/iron_ore/` içinde `iron_ore.fbx`, `iron_ore_albedo.png`, `iron_ore_normal.png`, `iron_ore_roughness.png`, `iron_ore_metallic.png`.
+
+| Eski Meshy adı | Yeni ad | Oyundaki kullanım |
+| --- | --- | --- |
+| `Meshy_AI_Ancient_Oak_Canopy_…` | `trees/ancient_oak` | Kesilebilir meşe |
+| `Meshy_AI_Emerald_Sentinel_…` | `trees/emerald_pine` | Kesilebilir çam |
+| `Meshy_AI_Silverleaf_Birch_…` | `trees/silverleaf_birch` | Kesilebilir huş |
+| `Meshy_AI_Twisted_Elder_…` | `trees/twisted_elder` | Kesilebilir yaşlı ağaç |
+| `…survival_RPG_20261105…` | `rocks/stone_boulder` | Kazılabilir taş kaya |
+| `…survival_RPG_mossy…` | `rocks/mossy_boulder` | Kazılabilir yosunlu kaya |
+| `…survival_RPG_copper_ore…` | `ores/copper_ore` | Bakır cevheri |
+| `…survival_RPG_iron_ore…` | `ores/iron_ore` | Demir cevheri |
+| `…survival_RPG_forest…` | `plants/fern` | Dekor eğrelti otu |
+| `…survival_RPG_freshly…` | `props/tree_stump` | Kesilen ağacın kütüğü + dekor |
+| `…survival_RPG_one_handed…` | `tools/hand_axe` | Eldeki balta |
+| `…survival_RPG_iron…` | `tools/pickaxe` | Eldeki kazma |
+
+### Yeni Meshy objesi ekleme
+
+1. Meshy'den FBX'i indirin, uygun kategoride `<ad>/` klasörü açın.
+2. Dosyaları `<ad>.fbx`, `<ad>_albedo.png` (+ varsa `_normal`, `_roughness`, `_metallic`) olarak adlandırın.
+3. `scripts/model_library.gd` içindeki `MODELS` sözlüğüne `"<ad>": "res://assets/…/<ad>"` satırını ekleyin.
+4. Koddan `MODEL_LIBRARY.instantiate("<ad>", yukseklik_metre)` ile çağırın: model y=0'a oturur, ölçeklenir ve PBR malzemesi otomatik bağlanır.
+
+FBX'e gömülü dokular içe aktarmada atılır (`fbx/embedded_image_handling=0`); dokular her zaman yanındaki PNG'lerden gelir. 4096 px dokular VRAM için 2048 px'e sınırlanır ve mipmap'lenir (`.import` dosyalarında `process/size_limit=2048`).
+
+**Performans notu:** Yeni Meshy modelleri çok yüksek poligonlu (eğrelti ~717 bin, demir cevheri ~386 bin, kütük ~300 bin üçgen). Godot otomatik LOD üretiyor, ancak Meshy'de **Remesh / düşük poligon (ör. 10–30 bin)** seçeneğiyle yeniden dışa aktarmak hem oyunu hem depo boyutunu ciddi rahatlatır.
+
+## Git LFS
+
+Depoda `.fbx`, `.glb`, `.png`, `.webp`, ses vb. ikili dosyalar **Git LFS** ile saklanır (`.gitattributes`). İlk kurulum, her bilgisayarda bir kez:
+
+```bash
+git lfs install
+git clone https://github.com/SerkanAydin06/ashvale-survival-rpg.git
+# zaten klonlanmışsa:
+git lfs pull
+```
+
+- Windows için Git LFS, "Git for Windows" ile birlikte gelir; `git lfs version` ile kontrol edin.
+- Yeni model/doku eklerken ekstra bir şey yapmanız gerekmez: `git add` uzantıya göre dosyayı LFS'e koyar. `git lfs ls-files` ile görebilirsiniz.
+- Godot'nun ürettiği `.import` ve `.uid` dosyaları normal Git'te kalır ve commit edilmelidir.
+- Model dosyası Godot'ta açılmıyorsa ve dosya ~130 bayt ise LFS içeriği indirilmemiştir: `git lfs pull` çalıştırın.
+- GitHub ücretsiz LFS depolama/bant genişliği kotası sınırlıdır. CI, LFS nesnelerini önbelleğe alarak her çalışmada yeniden indirmez.
+- Not: LFS'e geçiş önceki commit'leri yeniden yazmadı; eski geçmişteki büyük dosyalar `.git` boyutunda kalmaya devam eder. Geçmişi küçültmek için `git lfs migrate import` gerekir; bu force-push gerektirdiği için ayrıca karar verilmeli.
 
 ## Bakım ve doğrulama
 
 - Ana sahne `main.tscn`, kullanılan ana script `scripts/main.gd`.
 - Godot'un `.godot/` klasörü yerel olarak oluşturulur, Git'e eklenmez.
-- GitHub Actions iş akışı Godot 4.7.2 ile headless import ve kısa sahne açılış kontrolü yapar.
+- GitHub Actions iş akışı Godot 4.7.2 ile LFS dosyalarını çeker, headless import yapar, sahneyi açar ve `tests/` altındaki 8 tanılama testini çalıştırır (yeni: `tests/resource_props_diagnostics.gd` — tüm Meshy objeleri, kazma ile madencilik ve toplama).
 - Gerçek oyun görüntüsünü, karakter eklemlerini ve tam ekran davranışını Windows üzerinde F5 ile ayrıca kontrol edin.
 
 Proje bağlamı: [PROJECT_MEMORY.md](PROJECT_MEMORY.md).
@@ -104,7 +170,7 @@ Zemin **tek bir 160 metreye gerilmiş resim değildir**; 4m tekrar ile bütün y
 
 ## 4 Meshy agac modelinin entegrasyonu (4 Kasim 2026)
 
-`assets/obje` altinda 4 tur kullaniliyor: Ancient Oak Canopy (mese), Emerald Sentinel (cam), Silverleaf Birch (hus) ve Twisted Elder (yasli kuru agac). Her birinin kendi FBX ve ayni klasorde PNG kaplamasi var.
+`assets/environment/trees` altinda (eskiden `assets/obje`) 4 tur kullaniliyor: Ancient Oak Canopy (mese), Emerald Sentinel (cam), Silverleaf Birch (hus) ve Twisted Elder (yasli kuru agac). Her birinin kendi FBX ve ayni klasorde PNG kaplamasi var.
 
 - `scripts/main.gd` `TREE_MODEL_PATHS` ve `TREE_TEXTURE_PATHS` sabitleri 4 varligi baglar.
 - 24 agac, sabit tohumlu dogal dagilimla 160m zemine yerlestirilir; her agacin boyu ve donusu degisir.
@@ -140,3 +206,12 @@ Char1 FBX iskelet/modeli genellikle santimetre ölçeğiyle geliyor. Oyuncu mode
 ## Ayrı balta savurma animasyonu — 2026-11-05
 
 `scripts/axe_chop_animation.gd` gerçek Char1 Mixamo iskeletine, Idle pozundan türetilmiş, 2.28 saniyelik keyframe tabanlı `Ashvale/AxeChop` animasyonu kaydeder. Oyun klibi 3x hızda oynatarak 0.76 saniyelik bir balta savurma hareketi üretir. Gövde, kalça, sağ omuz, sağ üst/alt kol ve bilek ile sol kolun karşı hareketi ayrı rotasyon kanallarıyla animasyonlanır. Animasyonun 0.75 saniyelik iç zamanında (gerçekte 0.25 s) balta ağaca vurur. Önceki `Standing Melee Attack Downward.fbx` yedek olarak saklanır ama normal Char1 baltasında kullanılmaz. `tests/axe_swing_diagnostics.gd` özel klip, hareketli bilek kanalları, darbe zamanlaması ve ekipman varlığı testlerini yapar. Görsel ince ayar için oyun içi video/ekran görüntüsü hâlâ değerlidir.
+
+## Meshy objeleri, kazma ve madencilik — 2026-11-06
+
+- `assets/obje` içindeki karışık adlı tüm Meshy dosyaları kategorili klasörlere ve okunur adlara taşındı (yukarıdaki tabloya bakın); Godot'nun çıkardığı `_texture_0.png` kopyaları silindi.
+- `scripts/model_library.gd`: model kataloğu, ölçekleme, zemine oturtma ve PBR (albedo/normal/roughness/metallic) malzeme bağlama.
+- `scripts/mineable_rock.gd`: kazmayla kırılan kaya/cevher; sarsılma, taş kıymıkları, son darbede yere toplanabilir parçalar.
+- Eski 12 basit küre kaya kaldırıldı; yerine 10 Meshy kayası (taş + yosunlu), 4 bakır ve 3 demir cevheri geldi.
+- Prosedürel balta yerine Meshy `hand_axe` kullanılıyor (model yüklenemezse eski prosedürel balta yedek). Meshy `pickaxe` aynı ele bağlı, `2` ile seçiliyor.
+- Kesilen ağaçların yerinde Meshy `tree_stump` kalıyor; ayrıca 36 eğrelti otu ve 5 dekor kütük eklendi.

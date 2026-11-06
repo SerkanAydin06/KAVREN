@@ -116,3 +116,11 @@ README'ye göre dövüş, loot, crafting ve save henüz kapsamda değil; yeni g�
 - 0.76 saniyelik (2.28 / 3) animasyon: anticipation, overhead raise, downward impact, follow-through, recover. Darbe 0.25 s ve `CHOP_IMPACT_DELAY` ile eşleşir.
 - Eski saldırı FBX'i import yedeği olarak kalır.
 - `tests/axe_swing_diagnostics.gd`: gerçek aktif kemik track'leri, el hareketi, ekipman, darbe senkronizasyonu, klip süresi ve cooldown kontrolü.
+
+## 2026-11-06 — Varlık düzeni, madencilik, Git LFS
+
+- Meshy varlıkları `assets/environment/{trees,rocks,ores,plants,props}/<ad>/` ve `assets/tools/<ad>/` altına taşındı; adlandırma `<ad>.fbx` + `<ad>_albedo|normal|roughness|metallic.png`. Eski `assets/obje` yolu artık yok.
+- Model yükleme tek yerden: `scripts/model_library.gd` (`MODELS` sözlüğü). FBX gömülü dokuları atılıyor, malzeme PNG'lerden kuruluyor.
+- Oyun: `1` balta / `2` kazma; kazma `scripts/mineable_rock.gd` kaynaklarını kırar (taş, bakır, demir). Kaynak sayaçları: wood, stone, copper, iron.
+- Git LFS etkin (`.gitattributes`); CI `git lfs pull` + `.git/lfs` önbelleği kullanıyor. Geçmiş yeniden yazılmadı.
+- Yeni Meshy modelleri çok yüksek poligonlu (70 bin – 717 bin üçgen); düşük poligonlu yeniden dışa aktarma önerildi.
