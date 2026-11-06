@@ -1,38 +1,41 @@
 extends SceneTree
-
-func _initialize() -> void:
-	call_deferred("_capture")
-
+func _initialize() -> void: call_deferred("_capture")
 func _capture() -> void:
-	var scene: Node = load("res://main.tscn").instantiate()
+	var scene: Node = load("res://creature_valley.tscn").instantiate()
 	root.add_child(scene)
 	scene.set_physics_process(false)
-	scene.atmosphere.time_flows = false
-	scene.ui.hide()
 	var camera := Camera3D.new()
 	scene.add_child(camera)
 	camera.current = true
-	var views := [
-		["scout", Vector3(0.21, 1.70, 1.32), Vector3(0, 1.36, 0), 10.5],
-		["scout-back", Vector3(-0.76, 1.73, -2.55), Vector3(0, 1.13, 0), 10.5],
-		["camp-keyframe", Vector3(-0.3, 2.4, 4.7), Vector3(0, 2.7, -13), 9.0],
-		["camp", Vector3(0, 2.8, 5), Vector3(0, 3.4, -45), 8.5],
-		["trail", Vector3(6, 2.5, -27), Vector3(0, 4, -73), 11.0],
-		["mine", Vector3(-7, 2.8, -58), Vector3(0, 5, -78), 16.5],
-	]
 	var folder := "user://valley-views"
-	if DirAccess.make_dir_recursive_absolute(folder) != OK:
-		quit(1)
-		return
+	DirAccess.make_dir_recursive_absolute(folder)
+	var views := [
+		["companions-valley",Vector3(-5,5,12),Vector3(0,1.1,-8)],
+		["filizik",Vector3(-2,2.3,0.3),Vector3(-3,0.9,-3)],
+		["damlup",Vector3(11,4,-8),Vector3(9,2,-13)],
+		["cakilcik",Vector3(-5,5,-18),Vector3(-8,3.2,-22)],
+		["passage",Vector3(0,7,-25),Vector3(0,1,-39)],
+	]
 	for view in views:
-		scene.atmosphere.set_hour(view[3])
-		camera.position = view[1]
+		camera.position=view[1]
 		camera.look_at(view[2])
-		for frame in range(12):
+		for i in range(12):
 			await RenderingServer.frame_post_draw
-		var frame_image := root.get_texture().get_image()
-		if frame_image == null or frame_image.save_png(folder + "/" + view[0] + ".png") != OK:
+		var picture := root.get_texture().get_image()
+		if picture==null or picture.save_png(folder+"/"+view[0]+".png")!=OK:
 			quit(1)
 			return
-	print("Valley views: ", ProjectSettings.globalize_path(folder))
+	scene.player.position = scene.creatures[0].position
+	scene._interact()
+	scene._interact()
+	scene.player.position = scene.creatures[1].position+Vector3(0,0,1.5)
+	scene._interact()
+	scene._refresh_interface()
+	camera.position = scene.creatures[1].position+Vector3(2,2.4,5)
+	camera.look_at(scene.creatures[1].position+Vector3.UP)
+	for i in range(12):
+		await RenderingServer.frame_post_draw
+	if root.get_texture().get_image().save_png(folder+"/training.png")!=OK:
+		quit(1)
+		return
 	quit()
