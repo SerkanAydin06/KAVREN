@@ -9,13 +9,25 @@ func _run() -> void:
 	await physics_frame
 	if not game.height_at(0,-21)>2 or game.creatures.size()!=3:
 		failures += 1
+	for creature in game.creatures:
+		if creature.visible:
+			failures += 1
+	for i in range(3):
+		var rules = game.COMPANION
+		if rules.damage(i,1,(i+1)%3,false) <= rules.damage(i,1,i,false) or rules.damage(i,1,(i+2)%3,false) >= rules.damage(i,1,i,false):
+			failures += 1
+		if rules.max_hp(i,2)<=rules.max_hp(i,1) or rules.damage(i,2,i,true)<=rules.damage(i,2,i,false):
+			failures += 1
 	game.player.position = game.creatures[0].position
 	game._interact()
 	game._interact()
 	if game.roster != [0] or game.berries!=1 or game.creatures[0].visible:
 		failures += 1
 	game.player.position = game.creatures[1].position
-	game._interact()
+	game._check_habitat()
+	await game._battle_action(false,true)
+	if game.turn_count != 0:
+		failures += 1
 	if not game.battle_camera.current or not game.creatures[0].visible:
 		failures += 1
 	for turn in range(6):
@@ -30,7 +42,14 @@ func _run() -> void:
 		failures += 1
 	game.active_species = 0
 	# A recruited partner can still train; switching partners cannot consume all encounters.
+	game._check_habitat()
+	if game.battle != -1:
+		failures += 1
 	game._begin_training(1)
+	await game._battle_action(false,true)
+	await game._battle_action(false,true)
+	if game.turn_count != 1:
+		failures += 1
 	for turn in range(6):
 		await game._battle_action(false)
 	if game.battle!=-1 or game.experience[game.active_species]<=0:
