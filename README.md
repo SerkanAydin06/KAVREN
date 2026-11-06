@@ -1,4 +1,4 @@
-# Filizya · Yoldaşlar Vadisi
+# Kavren · Yoldaşlar Vadisi
 
 Kodla oluşturulan çizgi film dünyasında yaratıklarla dostluk kurma, gelişme ve keşif prototipi. Godot 4.7.2 ile project.godot'u açın ve F5'e basın.
 
