@@ -54,11 +54,12 @@ func _run() -> void:
 		if hit < 2 and original.is_falling:
 			failures += 1
 	# Tek bir centik her darbede derinlesir; gövde yuzeyinde ve bel hizasinda.
-	var notch: MeshInstance3D = original.get_node_or_null("ChopNotch")
-	if notch == null or notch.mesh == null or original.find_children("CutMark*", "", true, false).size() > 0:
+	var notch: Node3D = original.get_node_or_null("ChopNotch")
+	var notch_ready := notch is MeshInstance3D and (notch as MeshInstance3D).mesh != null
+	if not notch_ready or original.find_children("CutMark*", "", true, false).size() > 0:
 		failures += 1
 	else:
-		var notch_local: Vector3 = original.to_local(notch.global_position)
+		var notch_local: Vector3 = original.to_local(original._notch_surface)
 		var radial := Vector2(notch_local.x, notch_local.z).length()
 		if absf(notch_local.y - original.CHOP_HEIGHT) > 0.05 or radial < 0.1 or radial > 1.7 or notch.notch_depth <= 0.0:
 			failures += 1

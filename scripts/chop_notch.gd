@@ -15,17 +15,30 @@ render_mode cull_disabled, depth_draw_opaque;
 uniform float pull_to_camera = 0.2;
 uniform float trunk_radius = 0.5;
 uniform float ring_spacing = 0.035;
+// Renkler sRGB olarak secildi; Forward+/Mobile dogrusal uzayda isler.
+#if CURRENT_RENDERER == RENDERER_COMPATIBILITY
 const vec3 WOOD_LIGHT = vec3(0.80, 0.56, 0.28);
 const vec3 WOOD_RING = vec3(0.52, 0.31, 0.13);
 const vec3 BARK_COLOR = vec3(0.07, 0.04, 0.02);
+#else
+const vec3 WOOD_LIGHT = vec3(0.62, 0.30, 0.085);
+const vec3 WOOD_RING = vec3(0.24, 0.09, 0.02);
+const vec3 BARK_COLOR = vec3(0.006, 0.003, 0.001);
+#endif
 varying vec3 local_position;
 void vertex() {
 	local_position = VERTEX;
 	vec4 view_position = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
+	// Centik +Z'ye (disari) bakar. Onden bakilinca kabugun onune cekilir;
+	// yandan bakilinca cekme kalkar ve ic yuzeyler govdenin arkasinda kalir.
+	vec3 outward_view = normalize((MODELVIEW_MATRIX * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
+	float facing = dot(outward_view, -normalize(view_position.xyz));
 	float distance_to_camera = length(view_position.xyz);
-	float pull = min(pull_to_camera, distance_to_camera * 0.5);
+	float pull = min(pull_to_camera, distance_to_camera * 0.5) * smoothstep(0.15, 0.55, facing);
 	view_position.xyz -= normalize(view_position.xyz) * pull;
-	POSITION = PROJECTION_MATRIX * view_position;
+	// Cekilmis konumu VERTEX'e geri yaz: isik/golge hesabi kabuk yuzeyindeki
+	// noktaya gore yapilir (aksi halde govdenin icinde kalip karanlik gorunur).
+	VERTEX = (inverse(MODELVIEW_MATRIX) * view_position).xyz;
 }
 void fragment() {
 	// UV.x = 1: taze odun (halkali), 0: kabuk kenari. COLOR.r: golge carpani.
@@ -47,7 +60,7 @@ var notch_depth := 0.1
 
 func configure(radius: float) -> void:
 	trunk_radius = maxf(radius, 0.12)
-	notch_width = clampf(trunk_radius * 1.15, 0.2, 0.95)
+	notch_width = clampf(trunk_radius * 1.0, 0.2, 0.85)
 	notch_height = notch_width * 0.5
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if _shader == null:

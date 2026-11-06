@@ -31,13 +31,15 @@ const GRAVITY := 18.0
 # Tek bir dosyadan tum araziyi kaplayan seam-free malzeme.
 const GROUND_ALBEDO := preload("res://assets/ground/ashvale_soil_grass_1024.webp")
 const GROUND_SHADER := preload("res://assets/ground/ashvale_ground.gdshader")
-const GROUND_SIZE := 160.0
+const GROUND_SIZE := 600.0 # ufukta zemin kenari gorunmesin
 const GROUND_TILE_METERS := 4.0
 const STYLIZED_PREVIEW_SCENE := preload("res://scripts/stylized_asset_preview.gd")
 const AXE_CHOP_ANIMATION := preload("res://scripts/axe_chop_animation.gd")
 const CHOPPABLE_TREE_SCRIPT := preload("res://scripts/choppable_tree.gd")
 const AXE_SCRIPT := preload("res://scripts/stylized_axe.gd")
 const MODEL_LIBRARY := preload("res://scripts/model_library.gd")
+const ATMOSPHERE_SCRIPT := preload("res://scripts/atmosphere.gd")
+const CAMPFIRE_SCRIPT := preload("res://scripts/campfire.gd")
 const MINEABLE_ROCK_SCRIPT := preload("res://scripts/mineable_rock.gd")
 # Vurus erisimi: oyuncu merkezinden agac govdesi / kaya YUZEYINE metre.
 const MELEE_REACH := 1.0
@@ -150,6 +152,7 @@ var pending_chop_timer := 0.0
 var equipped_axe: Node3D
 var axe_attachment: Node3D
 var hand_grip: Node
+var atmosphere: Node3D
 
 func _ready() -> void:
 	_make_world()
@@ -162,19 +165,10 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 func _make_world() -> void:
-	var env_node := WorldEnvironment.new()
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.46, 0.57, 0.64)
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.8, 0.85, 0.8)
-	env_node.environment = env
-	add_child(env_node)
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-55, -30, 0)
-	sun.light_energy = 1.4
-	sun.shadow_enabled = true
-	add_child(sun)
+	# Gokyuzu, gun-gece dongusu, gunes/ay, GI, sis: scripts/atmosphere.gd
+	atmosphere = ATMOSPHERE_SCRIPT.new()
+	atmosphere.name = "Atmosphere"
+	add_child(atmosphere)
 	var ground := StaticBody3D.new()
 	ground.name = "Ground"
 	add_child(ground)
@@ -334,15 +328,9 @@ func _make_camp() -> void:
 	camp.name = "Camp"
 	camp.position = CAMP_POSITION
 	add_child(camp)
-	var pit := CylinderMesh.new()
-	pit.top_radius = 0.85
-	pit.bottom_radius = 0.85
-	pit.height = 0.2
-	_add_primitive(camp, pit, Vector3(0, 0.1, 0), Color(0.22, 0.2, 0.19))
-	var ember := SphereMesh.new()
-	ember.radius = 0.4
-	ember.height = 0.4
-	_add_primitive(camp, ember, Vector3(0, 0.25, 0), Color(0.98, 0.41, 0.09))
+	var fire := CAMPFIRE_SCRIPT.new()
+	fire.name = "Campfire"
+	camp.add_child(fire)
 
 func _make_mineables() -> void:
 	# Kampa yakin taslar, daha uzakta bakir ve demir cevheri damarlari.
@@ -494,7 +482,7 @@ func _make_hud() -> void:
 	controls.add_theme_color_override("font_shadow_color", Color.BLACK)
 	controls.add_theme_constant_override("shadow_offset_x", 2)
 	controls.add_theme_constant_override("shadow_offset_y", 2)
-	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Topla    1  Balta    2  Kazma    R  Yeniden Doğ\nFARE  Kamera / Zoom    SOL TIK  Kes / Kaz    ESC  İmleç    F11  Tam Ekran"
+	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Topla    1  Balta    2  Kazma    R  Yeniden Doğ    T  +1 Saat\nFARE  Kamera / Zoom    SOL TIK  Kes / Kaz    ESC  İmleç    F11  Tam Ekran"
 	controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(controls)
 	_update_hud()
@@ -521,7 +509,10 @@ func _update_hud() -> void:
 		hint = "\nÖLDÜN  —  [R] kampta yeniden doğ"
 	elif burning:
 		hint = "\nATEŞ YAKIYOR! Uzaklaş"
-	hud.text = "ASHVALE  •  KEŞİF\nCAN  %d    ODUN  %d    TAŞ  %d    BAKIR  %d    DEMİR  %d\nALET  %s    DAYANIKLILIK  %d%%%s\nKARAKTER  %s  |  %s\nANİMASYON  %s" % [int(ceilf(health)), wood, stone, copper, iron, TOOL_LABELS[active_tool], int(stamina), hint, loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status, current_animation_state]
+	var clock := ""
+	if atmosphere != null:
+		clock = "    SAAT  %s%s" % [atmosphere.clock_text(), "  (GECE)" if atmosphere.is_night() else ""]
+	hud.text = "ASHVALE  •  KEŞİF%s\nCAN  %d    ODUN  %d    TAŞ  %d    BAKIR  %d    DEMİR  %d\nALET  %s    DAYANIKLILIK  %d%%%s\nKARAKTER  %s  |  %s\nANİMASYON  %s" % [clock, int(ceilf(health)), wood, stone, copper, iron, TOOL_LABELS[active_tool], int(stamina), hint, loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status, current_animation_state]
 
 func _nearest_resource() -> Node3D:
 	var best: Node3D = null
@@ -1267,6 +1258,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
 		get_viewport().set_input_as_handled()
 		return
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_T and atmosphere != null:
+		atmosphere.advance_hours(1.0)
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
 		_respawn()
 	if is_dead:
