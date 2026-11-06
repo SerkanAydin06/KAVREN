@@ -76,12 +76,20 @@ func _rings(rows: Array, tint: Color, across := false, segments := 14) -> void:
 			var v1 := _point(lo, b, across)
 			var v2 := _point(hi, a, across)
 			var v3 := _point(hi, b, across)
-			_vertex(v0, lo[5], tint)
-			_vertex(v2, hi[5], tint)
-			_vertex(v1, lo[5], tint)
-			_vertex(v1, lo[5], tint)
-			_vertex(v2, hi[5], tint)
-			_vertex(v3, hi[5], tint)
+			if across and hi[0] > lo[0]:
+				_vertex(v0, lo[5], tint)
+				_vertex(v2, hi[5], tint)
+				_vertex(v1, lo[5], tint)
+				_vertex(v1, lo[5], tint)
+				_vertex(v2, hi[5], tint)
+				_vertex(v3, hi[5], tint)
+			else:
+				_vertex(v0, lo[5], tint)
+				_vertex(v1, lo[5], tint)
+				_vertex(v2, hi[5], tint)
+				_vertex(v1, lo[5], tint)
+				_vertex(v3, hi[5], tint)
+				_vertex(v2, hi[5], tint)
 	# Closed ends keep the sleeves and coat readable from above.
 	for row in [rows.front(), rows.back()]:
 		for i in range(segments):
@@ -97,9 +105,13 @@ func _point(row: Array, angle: float, across: bool) -> Vector3:
 
 func _patch(points: Array, bone: String, tint: Color) -> void:
 	for i in range(1, points.size() - 1):
-		for index in [0, i, i + 1]:
-			var p: Array = points[index]
-			_vertex(Vector3(p[0], p[1], p[2]), bone, tint)
+		var a: Array = points[0]
+		var b: Array = points[i]
+		var c: Array = points[i + 1]
+		var signed_area: float = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+		var order := [a, c, b] if signed_area * float(a[2]) > 0 else [a, b, c]
+		for point in order:
+			_vertex(Vector3(point[0], point[1], point[2]), bone, tint)
 
 func _outfit() -> void:
 	_rings([[0,0.90,-0.01,0.18,0.13,"Hips"],[0,1.02,-0.01,0.16,0.12,"Hips"],[0,1.16,-0.025,0.148,0.118,"Spine"],[0,1.34,-0.03,0.205,0.142,"Spine2"],[0,1.43,-0.035,0.202,0.124,"Spine2"],[0,1.49,-0.025,0.096,0.085,"Spine2"]],TEAL)
@@ -109,7 +121,7 @@ func _outfit() -> void:
 	_patch([[-0.045,1.04,0.123],[0.045,1.04,0.123],[0.045,1.095,0.123],[-0.045,1.095,0.123]],"Hips",GOLD)
 	# Folded neckerchief and two contrasting tails on the player's camera side.
 	_rings([[0,1.423,-0.029,0.177,0.142,"Spine2"],[0,1.473,-0.012,0.16,0.123,"Spine2"],[0,1.519,-0.009,0.109,0.105,"Neck"]],CORAL)
-	_patch([[-0.15,1.46,0.069],[0.146,1.46,0.068],[0.026,1.295,0.124]],"Spine2",CORAL)
+	_patch([[-0.124,1.465,0.110],[0.132,1.465,0.110],[0.045,1.30,0.157],[0.00,1.325,0.160]],"Spine2",CORAL)
 	_patch([[-0.095,1.465,-0.14],[0.04,1.46,-0.147],[-0.04,1.17,-0.201],[-0.152,1.215,-0.19]],"Spine2",RED)
 	_patch([[-0.052,1.46,-0.15],[0.068,1.455,-0.145],[0.155,1.26,-0.197],[0.063,1.28,-0.202]],"Spine2",CORAL)
 	# Small ochre field pouch is visible while travelling away from the camera.
@@ -132,7 +144,19 @@ func _outfit() -> void:
 		_rings([[sign_value*0.35,1.425,-0.05,0.078,0.081,upper],[sign_value*0.38,1.425,-0.05,0.075,0.079,upper]],CREAM,true)
 		_rings([[sign_value*0.366,1.425,-0.05,0.061,0.064,upper],[sign_value*0.45,1.426,-0.052,0.057,0.058,fore],[sign_value*0.66,1.426,-0.052,0.041,0.045,fore]],SKIN,true)
 		_rings([[sign_value*0.57,1.426,-0.055,0.057,0.06,fore],[sign_value*0.69,1.426,-0.055,0.046,0.053,fore]],BOOTS,true)
-		_rings([[sign_value*0.68,1.426,-0.051,0.043,0.052,hand],[sign_value*0.75,1.426,-0.048,0.047,0.057,hand],[sign_value*0.797,1.424,-0.044,0.032,0.04,hand]],BOOTS,true)
+		_rings([[sign_value*0.68,1.426,-0.051,0.043,0.052,hand],[sign_value*0.75,1.426,-0.048,0.047,0.057,hand],[sign_value*0.827,1.424,-0.052,0.024,0.051,hand]],BOOTS,true)
+
+		for finger in ["Thumb", "Index", "Middle", "Ring", "Pinky"]:
+			var rows: Array = []
+			for segment in range(1, 5):
+				var name := "%sHand%s%d" % [side, finger, segment]
+				if not bones.has(name):
+					break
+				var joint := (rig.get_bone_global_rest(bones[name]).origin - origin) / scale_factor
+				var radius := lerpf(0.014, 0.008, float(segment-1) / 3.0)
+				rows.append([joint.x, joint.y, joint.z, radius, radius, name])
+			if rows.size() >= 2:
+				_rings(rows, BOOTS, true, 6)
 
 func _face() -> void:
 	_rings([[0,1.465,0,0.066,0.061,"Neck"],[0,1.59,0,0.072,0.072,"Neck"]],SKIN)
@@ -148,7 +172,7 @@ func _face() -> void:
 		_patch([[x*0.021,1.666,0.154],[x*0.040,1.694,0.151],[x*0.082,1.692,0.131],[x*0.111,1.685,0.108],[x*0.097,1.673,0.119],[x*0.077,1.684,0.137],[x*0.041,1.685,0.152]],"Head",HAIR)
 		_patch([[x*0.03,1.71,0.145],[x*0.081,1.715,0.124],[x*0.096,1.708,0.111],[x*0.034,1.704,0.145]],"Head",HAIR)
 	_patch([[-0.014,1.622,0.146],[0,1.645,0.146],[0.009,1.62,0.161]],"Head",Color("#e59e79"))
-	_patch([[-0.026,1.581,0.136],[0.0,1.577,0.140],[0.029,1.584,0.135],[0.007,1.572,0.14]],"Head",Color("#a25756"))
+	_patch([[-0.030,1.583,0.141],[0.0,1.576,0.150],[0.031,1.585,0.141],[0.012,1.571,0.150],[-0.006,1.570,0.149]],"Head",Color("#a25756"))
 
 func _hair() -> void:
 	# Ink-blue layered cap. The fringe stays above the irises; longer locks frame the cheeks.
