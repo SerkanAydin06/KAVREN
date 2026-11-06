@@ -215,3 +215,10 @@ Char1 FBX iskelet/modeli genellikle santimetre ölçeğiyle geliyor. Oyuncu mode
 - Eski 12 basit küre kaya kaldırıldı; yerine 10 Meshy kayası (taş + yosunlu), 4 bakır ve 3 demir cevheri geldi.
 - Prosedürel balta yerine Meshy `hand_axe` kullanılıyor (model yüklenemezse eski prosedürel balta yedek). Meshy `pickaxe` aynı ele bağlı, `2` ile seçiliyor.
 - Kesilen ağaçların yerinde Meshy `tree_stump` kalıyor; ayrıca 36 eğrelti otu ve 5 dekor kütük eklendi.
+
+## Alet kavrama düzeltmesi — 2026-11-06
+
+- Balta ve kazma artık gerçekten avuçta: kavrama noktası ve yönü sabit sayılarla değil, Char1'in el iskeletinden hesaplanıyor. Sap işaret→serçe parmak doğrultusunda avucun içinden geçiyor, alet başı başparmak tarafında, ağız vuruş yönüne bakıyor.
+- Meshy modellerinde sap, sınır kutusunun merkezinde değil (balta başı sapın bir yanına taşıyor). `scripts/main.gd` içindeki `TOOL_GRIPS` her aletin sap kaymasını (`handle_x`), tutuş yüksekliğini (`grip_height`) ve ağız yönünü (`blade_sign`) tutuyor.
+- `scripts/hand_grip.gd` (`SkeletonModifier3D`): hangi animasyon oynarsa oynasın sağ eldeki parmakları sapın etrafında yumruk yapar. Kıvrılma açıları dosyanın başındaki tablolardan ayarlanabilir.
+- İnce ayar için: kavrama noktası `GRIP_ALONG_PALM` (avuç boyunca) ve `GRIP_PALM_OFFSET` (avuçtan uzaklık, metre) sabitleriyle kaydırılabilir.

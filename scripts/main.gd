@@ -36,6 +36,16 @@ const AXE_SCRIPT := preload("res://scripts/stylized_axe.gd")
 const MODEL_LIBRARY := preload("res://scripts/model_library.gd")
 const MINEABLE_ROCK_SCRIPT := preload("res://scripts/mineable_rock.gd")
 const MINE_RANGE := 3.0
+const HAND_GRIP_SCRIPT := preload("res://scripts/hand_grip.gd")
+# Meshy aletlerinin sap konumu (model boyuna oranla). handle_x: sapin
+# sinir kutusu merkezine gore X kaymasi; grip_height: tutus yuksekligi;
+# blade_sign: agzin +X (1) mi -X (-1) mi tarafinda oldugu.
+const TOOL_GRIPS := {
+	"hand_axe": {"handle_x": 0.105, "grip_height": 0.16, "blade_sign": -1.0},
+	"pickaxe": {"handle_x": 0.02, "grip_height": 0.16, "blade_sign": 1.0},
+}
+const GRIP_ALONG_PALM := 0.78 # el kokunden parmak koklerine oran
+const GRIP_PALM_OFFSET := 0.032 # metre, avuc yuzeyinden sap merkezine
 const CHOP_RANGE := 3.4
 const CHOP_IMPACT_DELAY := 0.25
 const ATTACK_PLAYBACK_SPEED := 3.0 # 2.28 sn'lik AxeChop klibini ~0.76 sn'de oynat.
@@ -104,6 +114,7 @@ var pending_chop_target: Node3D = null
 var pending_chop_timer := 0.0
 var equipped_axe: Node3D
 var axe_attachment: Node3D
+var hand_grip: Node
 
 func _ready() -> void:
 	_make_world()
@@ -1033,6 +1044,11 @@ func _make_axe() -> void:
 		mount.add_child(equipped_axe)
 		_place_tool(mount, equipped_axe)
 	equipped_pickaxe = _make_tool(mount, "pickaxe", "StarterPickaxe", 0.85)
+	if mount is BoneAttachment3D:
+		var grip_modifier := HAND_GRIP_SCRIPT.new()
+		grip_modifier.name = "RightHandGrip"
+		skeleton.add_child(grip_modifier)
+		hand_grip = grip_modifier
 	_select_tool("axe")
 	print("Ashvale equipped tools: mount=", hand_bone if not hand_bone.is_empty() else "fallback", " axe=", equipped_axe.get_meta("model_key", "procedural"), " pickaxe=", equipped_pickaxe != null, " world_scale=", equipped_axe.global_transform.basis.get_scale())
 
@@ -1040,15 +1056,28 @@ func _make_tool(mount: Node3D, model_key: String, tool_name: String, length: flo
 	var model := MODEL_LIBRARY.instantiate(model_key, length)
 	if model == null:
 		return null
+	var grip: Dictionary = TOOL_GRIPS.get(model_key, {})
 	var tool := Node3D.new()
 	tool.name = tool_name
 	tool.set_meta("model_key", model_key)
-	# Meshy aletleri sap asagi, bas yukari duruyor. Tutus noktasi sapin alt ceyregi.
-	model.position.y -= length * 0.3
+	tool.set_meta("blade_sign", float(grip.get("blade_sign", 1.0)))
+	# Aracin orijini = elin kavradigi nokta. Sap ekseni X=Z=0 cizgisine,
+	# kavrama yuksekligi y=0'a tasinir (model tabani y=0'da geliyor).
+	model.position.x -= float(grip.get("handle_x", 0.0)) * length
+	model.position.y -= float(grip.get("grip_height", 0.16)) * length
 	tool.add_child(model)
 	mount.add_child(tool)
 	_place_tool(mount, tool)
 	return tool
+
+func _hand_bone_offset(hand_index: int, suffix: String) -> Vector3:
+	# Parmak kemiginin dinlenme konumu, el kemiginin yerel uzayinda.
+	var hand_rest := skeleton.get_bone_global_rest(hand_index)
+	for bone_index in range(skeleton.get_bone_count()):
+		var compact_name := String(skeleton.get_bone_name(bone_index)).to_lower().replace("_", "").replace(":", "")
+		if compact_name.ends_with(suffix):
+			return hand_rest.affine_inverse() * skeleton.get_bone_global_rest(bone_index).origin
+	return Vector3.ZERO
 
 func _place_tool(mount: Node3D, tool: Node3D) -> void:
 	# Mount her rigde farkli unit-scale tasiyabilir (cm -> metre). Alet
@@ -1056,13 +1085,35 @@ func _place_tool(mount: Node3D, tool: Node3D) -> void:
 	var mount_scale := mount.global_transform.basis.get_scale()
 	var inherited_scale := maxf((mount_scale.x + mount_scale.y + mount_scale.z) / 3.0, 0.0001)
 	var unit_correction := 1.0 / inherited_scale
-	tool.scale = Vector3.ONE * unit_correction
-	if mount is BoneAttachment3D:
-		tool.position = Vector3(0.02, -0.12, 0.05) * unit_correction
-		tool.rotation_degrees = Vector3(87, 0, -12)
-	else:
+	if not mount is BoneAttachment3D:
+		tool.scale = Vector3.ONE * unit_correction
 		tool.position = Vector3(0.43, 1.15, -0.20) * unit_correction
 		tool.rotation_degrees = Vector3(0, -12, -24)
+		return
+	# Kavrama el iskeletinden hesaplanir: sap avucun icinden isaret->serce
+	# parmak dogrultusunda gecer, alet basi basparmak tarafinda kalir,
+	# agiz parmaklarin baktigi yone (vurus yonune) bakar.
+	var hand_index := skeleton.find_bone((mount as BoneAttachment3D).bone_name)
+	var index_knuckle := _hand_bone_offset(hand_index, "righthandindex1")
+	var pinky_knuckle := _hand_bone_offset(hand_index, "righthandpinky1")
+	var middle_knuckle := _hand_bone_offset(hand_index, "righthandmiddle1")
+	var thumb_root := _hand_bone_offset(hand_index, "righthandthumb1")
+	var finger_dir := middle_knuckle.normalized() if middle_knuckle.length() > 0.0001 else Vector3.UP
+	var handle_dir := index_knuckle - pinky_knuckle
+	handle_dir = (handle_dir - finger_dir * handle_dir.dot(finger_dir)).normalized()
+	if handle_dir.length() < 0.5:
+		handle_dir = Vector3.RIGHT
+	var palm_dir := Vector3(0, 0, 1.0 if thumb_root.z >= 0.0 else -1.0)
+	palm_dir = (palm_dir - finger_dir * palm_dir.dot(finger_dir) - handle_dir * palm_dir.dot(handle_dir)).normalized()
+	var blade_sign := float(tool.get_meta("blade_sign", 1.0))
+	var x_axis := finger_dir * blade_sign
+	var y_axis := handle_dir
+	var z_axis := x_axis.cross(y_axis).normalized()
+	# Kavrama noktasi: avuc ortasi, parmak koklerinden biraz geride ve
+	# kivrilan parmaklarin olusturdugu halkanin icinde (avucun onunde).
+	var knuckle_center := (index_knuckle + pinky_knuckle) * 0.5
+	var grip_point := knuckle_center * GRIP_ALONG_PALM + palm_dir * (GRIP_PALM_OFFSET * unit_correction)
+	tool.transform = Transform3D(Basis(x_axis, y_axis, z_axis).scaled(Vector3.ONE * unit_correction), grip_point)
 
 
 func _make_camera() -> void:
