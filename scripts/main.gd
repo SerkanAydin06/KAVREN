@@ -33,26 +33,41 @@ const STYLIZED_PREVIEW_SCENE := preload("res://scripts/stylized_asset_preview.gd
 const AXE_CHOP_ANIMATION := preload("res://scripts/axe_chop_animation.gd")
 const CHOPPABLE_TREE_SCRIPT := preload("res://scripts/choppable_tree.gd")
 const AXE_SCRIPT := preload("res://scripts/stylized_axe.gd")
+const MODEL_LIBRARY := preload("res://scripts/model_library.gd")
+const MINEABLE_ROCK_SCRIPT := preload("res://scripts/mineable_rock.gd")
+const MINE_RANGE := 3.0
 const CHOP_RANGE := 3.4
 const CHOP_IMPACT_DELAY := 0.25
-const ATTACK_PLAYBACK_SPEED := 3.0 # 2.27 sn'lik FBX hareketi ~0.76 sn'de oynat.
+const ATTACK_PLAYBACK_SPEED := 3.0 # 2.28 sn'lik AxeChop klibini ~0.76 sn'de oynat.
 # Tekrarlanan FBX sahneleri paylasilan Mesh/Texture kaynaklarini kullanir.
+const TREE_MODEL_KEYS := ["ancient_oak", "emerald_pine", "silverleaf_birch", "twisted_elder"]
 const TREE_MODEL_PATHS := [
-	"res://assets/obje/Meshy_AI_Ancient_Oak_Canopy_20261104_texture_fbx/Meshy_AI_Ancient_Oak_Canopy_20261104_texture.fbx",
-	"res://assets/obje/Meshy_AI_Emerald_Sentinel_20261104_texture_fbx/Meshy_AI_Emerald_Sentinel_20261104_texture.fbx",
-	"res://assets/obje/Meshy_AI_Silverleaf_Birch_1104184945_texture_fbx/Meshy_AI_Silverleaf_Birch_1104184945_texture.fbx",
-	"res://assets/obje/Meshy_AI_Twisted_Elder_20261104_texture_fbx/Meshy_AI_Twisted_Elder_20261104_texture.fbx",
+	"res://assets/environment/trees/ancient_oak/ancient_oak.fbx",
+	"res://assets/environment/trees/emerald_pine/emerald_pine.fbx",
+	"res://assets/environment/trees/silverleaf_birch/silverleaf_birch.fbx",
+	"res://assets/environment/trees/twisted_elder/twisted_elder.fbx",
 ]
 const TREE_TEXTURE_PATHS := [
-	"res://assets/obje/Meshy_AI_Ancient_Oak_Canopy_20261104_texture_fbx/Meshy_AI_Ancient_Oak_Canopy_20261104_texture.png",
-	"res://assets/obje/Meshy_AI_Emerald_Sentinel_20261104_texture_fbx/Meshy_AI_Emerald_Sentinel_20261104_texture.png",
-	"res://assets/obje/Meshy_AI_Silverleaf_Birch_1104184945_texture_fbx/Meshy_AI_Silverleaf_Birch_1104184945_texture.png",
-	"res://assets/obje/Meshy_AI_Twisted_Elder_20261104_texture_fbx/Meshy_AI_Twisted_Elder_20261104_texture.png",
+	"res://assets/environment/trees/ancient_oak/ancient_oak_albedo.png",
+	"res://assets/environment/trees/emerald_pine/emerald_pine_albedo.png",
+	"res://assets/environment/trees/silverleaf_birch/silverleaf_birch_albedo.png",
+	"res://assets/environment/trees/twisted_elder/twisted_elder_albedo.png",
 ]
 const TREE_NAMES := ["Oak", "Pine", "Birch", "Elder"]
 const TREE_HEIGHTS := [8.0, 10.0, 8.7, 7.0]
 const TREE_TRUNK_RADII := [0.62, 0.40, 0.37, 0.55]
 const TREE_COUNT := 24
+# Kazma ile kirilan kaynaklar: model, kaynak turu, yukseklik, vurus, parca sayisi.
+const ROCK_TYPES := {
+	"stone_boulder": {"kind": "stone", "height": 1.15, "hits": 3, "drops": 2},
+	"mossy_boulder": {"kind": "stone", "height": 1.35, "hits": 3, "drops": 3},
+	"copper_ore": {"kind": "copper", "height": 1.0, "hits": 4, "drops": 2},
+	"iron_ore": {"kind": "iron", "height": 1.2, "hits": 5, "drops": 2},
+}
+const RESOURCE_LABELS := {"wood": "ODUN", "stone": "TAŞ", "copper": "BAKIR", "iron": "DEMİR"}
+const TOOL_LABELS := {"axe": "BALTA", "pickaxe": "KAZMA"}
+const FERN_COUNT := 36
+const DECOR_STUMP_COUNT := 5
 
 var player: CharacterBody3D
 var visuals: Node3D
@@ -79,6 +94,10 @@ var hud: Label
 var resource_nodes: Array[Node3D] = []
 var wood := 0
 var stone := 0
+var copper := 0
+var iron := 0
+var active_tool := "axe"
+var equipped_pickaxe: Node3D
 var stamina := 100.0
 var camera_distance := 5.0
 var pending_chop_target: Node3D = null
@@ -142,7 +161,7 @@ func _make_stylized_preview() -> void:
 	add_child(preview)
 	var preview_oak := preview.get_node_or_null("StylizedOak") as Node3D
 	if preview_oak != null:
-		preview_oak.connect("wood_dropped", Callable(self, "_register_wood_drops"))
+		preview_oak.connect("wood_dropped", Callable(self, "_register_drops"))
 		resource_nodes.append(preview_oak)
 	print("Ashvale style preview: stylized tree + rock added")
 
@@ -204,7 +223,7 @@ func _make_camp() -> void:
 	for model_path in TREE_MODEL_PATHS:
 		var packed: PackedScene = null
 		if ResourceLoader.exists(model_path):
-			var model_resource: Resource = load(model_path)
+			var model_resource: Resource = load(String(model_path))
 			if model_resource is PackedScene:
 				packed = model_resource as PackedScene
 		if packed == null:
@@ -219,7 +238,7 @@ func _make_camp() -> void:
 		var tree_pos := Vector3(cos(direction_angle) * distance, 0.0, sin(direction_angle) * distance)
 		var tree := CHOPPABLE_TREE_SCRIPT.new()
 		tree.name = "%s_%02d" % [TREE_NAMES[kind], i]
-		tree.connect("wood_dropped", Callable(self, "_register_wood_drops"))
+		tree.connect("wood_dropped", Callable(self, "_register_drops"))
 		tree.position = tree_pos
 		tree.rotation.y = tree_random.randf_range(0.0, TAU)
 		add_child(tree)
@@ -238,7 +257,8 @@ func _make_camp() -> void:
 					var offset_x := bounds.position.x + bounds.size.x * 0.5
 					var offset_z := bounds.position.z + bounds.size.z * 0.5
 					model_node.position = Vector3(-offset_x, -bounds.position.y, -offset_z) * uniform_scale
-				_ensure_tree_texture(model_node, String(TREE_TEXTURE_PATHS[kind]))
+				if MODEL_LIBRARY.apply_material(model_node, String(TREE_MODEL_KEYS[kind])) == 0:
+					_ensure_tree_texture(model_node, String(TREE_TEXTURE_PATHS[kind]))
 			else:
 				tree_model.queue_free()
 				_make_placeholder_tree(tree, tree_height)
@@ -260,28 +280,9 @@ func _make_camp() -> void:
 		resource_nodes.append(tree)
 	print("Ashvale forest: ", TREE_COUNT, " trees / ", TREE_MODEL_PATHS.size(), " species")
 
-	for i in range(12):
-		var angle := float(i) * TAU / 12.0 + 0.23
-		var distance := 5.5 + float(i % 3) * 4.0
-		var rock := Node3D.new()
-		rock.name = "Rock_%02d" % i
-		rock.position = Vector3(cos(angle) * distance, 0, sin(angle) * distance)
-		add_child(rock)
-		var rock_mesh := SphereMesh.new()
-		rock_mesh.radius = 0.65
-		rock_mesh.height = 0.9
-		_add_primitive(rock, rock_mesh, Vector3(0, 0.35, 0), Color(0.40, 0.43, 0.43))
-		var rock_body := StaticBody3D.new()
-		rock_body.name = "RockBody"
-		rock.add_child(rock_body)
-		var rock_collision := CollisionShape3D.new()
-		var rock_shape := SphereShape3D.new()
-		rock_shape.radius = 0.62
-		rock_collision.shape = rock_shape
-		rock_collision.position.y = 0.35
-		rock_body.add_child(rock_collision)
-		rock.set_meta("resource_type", "stone")
-		resource_nodes.append(rock)
+	_make_mineables()
+	_make_ferns()
+	_make_decor_stumps()
 	var camp := Node3D.new()
 	camp.name = "Camp"
 	camp.position = Vector3(3, 0, 2)
@@ -295,6 +296,107 @@ func _make_camp() -> void:
 	ember.radius = 0.4
 	ember.height = 0.4
 	_add_primitive(camp, ember, Vector3(0, 0.25, 0), Color(0.98, 0.41, 0.09))
+
+func _make_mineables() -> void:
+	# Kampa yakin taslar, daha uzakta bakir ve demir cevheri damarlari.
+	var placements: Array = []
+	for i in range(10):
+		var angle := float(i) * TAU / 10.0 + 0.23
+		placements.append(["stone_boulder" if i % 2 == 0 else "mossy_boulder", angle, 6.0 + float(i % 3) * 3.5])
+	for i in range(4):
+		placements.append(["copper_ore", 0.6 + float(i) * 0.35, 18.0 + float(i % 2) * 4.0])
+	for i in range(3):
+		placements.append(["iron_ore", PI + 0.4 + float(i) * 0.4, 24.0 + float(i % 2) * 5.0])
+	var counts: Dictionary = {}
+	var rock_random := RandomNumberGenerator.new()
+	rock_random.seed = 20261105
+	for entry in placements:
+		var key := String(entry[0])
+		var config: Dictionary = ROCK_TYPES[key]
+		var index: int = counts.get(key, 0)
+		counts[key] = index + 1
+		var rock := MINEABLE_ROCK_SCRIPT.new()
+		rock.name = "%s_%02d" % [key.to_pascal_case(), index]
+		rock.resource_kind = String(config["kind"])
+		rock.max_hits = int(config["hits"])
+		rock.drop_count = int(config["drops"])
+		var angle: float = entry[1]
+		var distance: float = entry[2]
+		rock.position = Vector3(cos(angle) * distance, 0, sin(angle) * distance)
+		rock.rotation.y = rock_random.randf_range(0.0, TAU)
+		add_child(rock)
+		var height: float = float(config["height"]) * rock_random.randf_range(0.85, 1.15)
+		var model := MODEL_LIBRARY.instantiate(key, height)
+		var footprint := Vector3(height, height, height)
+		if model != null:
+			rock.add_child(model)
+			footprint = MODEL_LIBRARY.measure_bounds(model).size * model.scale.x
+		else:
+			var fallback := SphereMesh.new()
+			fallback.radius = height * 0.55
+			fallback.height = height
+			_add_primitive(rock, fallback, Vector3(0, height * 0.5, 0), Color(0.40, 0.43, 0.43))
+		var rock_body := StaticBody3D.new()
+		rock_body.name = "RockBody"
+		rock.add_child(rock_body)
+		var rock_collision := CollisionShape3D.new()
+		rock_collision.name = "CollisionShape3D"
+		var rock_shape := CylinderShape3D.new()
+		rock_shape.radius = maxf(minf(footprint.x, footprint.z) * 0.42, 0.25)
+		rock_shape.height = maxf(footprint.y, 0.3)
+		rock_collision.shape = rock_shape
+		rock_collision.position.y = rock_shape.height * 0.5
+		rock_body.add_child(rock_collision)
+		rock.set_meta("resource_type", "mineable")
+		rock.set_meta("rock_model", key)
+		rock.connect("resources_dropped", Callable(self, "_register_drops"))
+		resource_nodes.append(rock)
+	print("Ashvale mineables: ", counts)
+
+func _make_ferns() -> void:
+	# Sadece dekor: carpisma yok, golge yok, uzakta gizlenir (Meshy egrelti cok poligonlu).
+	var fern_random := RandomNumberGenerator.new()
+	fern_random.seed = 361
+	var placed := 0
+	for i in range(FERN_COUNT):
+		var angle := fern_random.randf_range(0.0, TAU)
+		var distance := fern_random.randf_range(7.0, 50.0)
+		var model := MODEL_LIBRARY.instantiate("fern", fern_random.randf_range(0.6, 1.0))
+		if model == null:
+			break
+		var fern := Node3D.new()
+		fern.name = "Fern_%02d" % i
+		fern.position = Vector3(cos(angle) * distance, 0, sin(angle) * distance)
+		fern.rotation.y = fern_random.randf_range(0.0, TAU)
+		fern.add_child(model)
+		MODEL_LIBRARY.set_visibility_range(model, 40.0, false)
+		add_child(fern)
+		placed += 1
+	print("Ashvale ferns: ", placed)
+
+func _make_decor_stumps() -> void:
+	# Eski kesimlerden kalmis kutukler: ormanin icine dogal detay.
+	for i in range(DECOR_STUMP_COUNT):
+		var angle := float(i) * TAU / float(DECOR_STUMP_COUNT) + 0.9
+		var model := MODEL_LIBRARY.instantiate("tree_stump", 0.7 + float(i % 2) * 0.15)
+		if model == null:
+			return
+		var stump := Node3D.new()
+		stump.name = "OldStump_%02d" % i
+		stump.position = Vector3(cos(angle) * (11.0 + float(i) * 1.7), 0, sin(angle) * (11.0 + float(i) * 1.7))
+		stump.rotation.y = float(i) * 1.3
+		stump.add_child(model)
+		var body := StaticBody3D.new()
+		body.name = "StumpBody"
+		stump.add_child(body)
+		var collision := CollisionShape3D.new()
+		var shape := CylinderShape3D.new()
+		shape.radius = 0.42
+		shape.height = 0.6
+		collision.shape = shape
+		collision.position.y = 0.3
+		body.add_child(collision)
+		add_child(stump)
 
 func _make_hud() -> void:
 	var layer := CanvasLayer.new()
@@ -345,7 +447,7 @@ func _make_hud() -> void:
 	controls.add_theme_color_override("font_shadow_color", Color.BLACK)
 	controls.add_theme_constant_override("shadow_offset_x", 2)
 	controls.add_theme_constant_override("shadow_offset_y", 2)
-	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Odun / Taş Topla\nFARE  Kamera / Zoom    SOL TIK  Balta / Saldırı    ESC  İmleç    F11  Tam Ekran"
+	controls.text = "WASD  Hareket    SHIFT  Koş    SPACE  Zıpla    E  Topla    1  Balta    2  Kazma\nFARE  Kamera / Zoom    SOL TIK  Kes / Kaz    ESC  İmleç    F11  Tam Ekran"
 	controls.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_root.add_child(controls)
 	_update_hud()
@@ -354,12 +456,21 @@ func _update_hud() -> void:
 	var nearby := _nearest_resource()
 	var hint := ""
 	if nearby != null:
-		hint = "\n[E] %s topla" % ("ODUN" if String(nearby.get_meta("resource_type")) == "wood_drop" else "TAŞ")
-	else:
+		var kind := String(nearby.get_meta("resource_type")).trim_suffix("_drop")
+		hint = "\n[E] %s topla" % RESOURCE_LABELS.get(kind, kind.to_upper())
+	elif active_tool == "axe":
 		var nearby_tree := _nearest_choppable_tree()
 		if nearby_tree != null:
 			hint = "\n[SOL TIK] AGACI KES (%d/%d)" % [nearby_tree.hits_taken, nearby_tree.MAX_HITS]
-	hud.text = "ASHVALE  •  KEŞİF\nODUN  %d     TAŞ  %d\nDAYANIKLILIK  %d%%%s\nKARAKTER  %s  |  %s\nANİMASYON  %s" % [wood, stone, int(stamina), hint, loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status, current_animation_state]
+		elif _nearest_mineable_rock() != null:
+			hint = "\n[2] Kayayı kırmak için KAZMA'ya geç"
+	else:
+		var nearby_rock := _nearest_mineable_rock()
+		if nearby_rock != null:
+			hint = "\n[SOL TIK] %s KAZ (%d/%d)" % [RESOURCE_LABELS.get(nearby_rock.resource_kind, "TAŞ"), nearby_rock.hits_taken, nearby_rock.max_hits]
+		elif _nearest_choppable_tree() != null:
+			hint = "\n[1] Ağacı kesmek için BALTA'ya geç"
+	hud.text = "ASHVALE  •  KEŞİF\nODUN  %d    TAŞ  %d    BAKIR  %d    DEMİR  %d\nALET  %s    DAYANIKLILIK  %d%%%s\nKARAKTER  %s  |  %s\nANİMASYON  %s" % [wood, stone, copper, iron, TOOL_LABELS[active_tool], int(stamina), hint, loaded_character_path.get_file().get_basename() if not loaded_character_path.is_empty() else "yok", character_animation_status, current_animation_state]
 
 func _nearest_resource() -> Node3D:
 	var best: Node3D = null
@@ -367,13 +478,32 @@ func _nearest_resource() -> Node3D:
 	for node in resource_nodes:
 		if not is_instance_valid(node) or node.is_queued_for_deletion():
 			continue
-		var resource_kind := String(node.get_meta("resource_type", ""))
-		if resource_kind != "wood_drop" and resource_kind != "stone":
+		if not String(node.get_meta("resource_type", "")).ends_with("_drop"):
 			continue
 		var distance := player.global_position.distance_to(node.global_position)
 		if distance < best_distance:
 			best_distance = distance
 			best = node
+	return best
+
+func _nearest_mineable_rock() -> Node3D:
+	var best: Node3D = null
+	var best_distance := MINE_RANGE
+	var forward := Basis(Vector3.UP, yaw) * Vector3.FORWARD
+	for node in resource_nodes:
+		if not is_instance_valid(node) or node.is_queued_for_deletion():
+			continue
+		if String(node.get_meta("resource_type", "")) != "mineable" or not node.has_method("take_pickaxe_hit"):
+			continue
+		var relative := node.global_position - player.global_position
+		relative.y = 0.0
+		var distance := relative.length()
+		if distance >= best_distance or distance < 0.001:
+			continue
+		if forward.dot(relative / distance) < 0.22:
+			continue
+		best = node
+		best_distance = distance
 	return best
 
 func _nearest_choppable_tree() -> Node3D:
@@ -396,7 +526,7 @@ func _nearest_choppable_tree() -> Node3D:
 		best_distance = distance
 	return best
 
-func _register_wood_drops(drops: Array) -> void:
+func _register_drops(drops: Array) -> void:
 	for item in drops:
 		if item is Node3D:
 			resource_nodes.append(item as Node3D)
@@ -405,10 +535,17 @@ func _collect_resource() -> void:
 	var target := _nearest_resource()
 	if target == null:
 		return
-	if String(target.get_meta("resource_type")) == "wood_drop":
-		wood += int(target.get_meta("wood_amount", 1))
-	else:
-		stone += 1
+	var kind := String(target.get_meta("resource_type")).trim_suffix("_drop")
+	var amount := int(target.get_meta("wood_amount", target.get_meta("amount", 1)))
+	match kind:
+		"wood":
+			wood += amount
+		"stone":
+			stone += amount
+		"copper":
+			copper += amount
+		"iron":
+			iron += amount
 	resource_nodes.erase(target)
 	target.queue_free()
 	_update_hud()
@@ -423,10 +560,27 @@ func _advance_axe_impact(delta: float) -> void:
 	pending_chop_target = null
 	if not is_instance_valid(target) or target.is_queued_for_deletion():
 		return
-	if player.global_position.distance_to(target.global_position) > CHOP_RANGE + 0.4:
+	if target.has_method("take_axe_hit"):
+		if player.global_position.distance_to(target.global_position) > CHOP_RANGE + 0.4:
+			return
+		if target.take_axe_hit(player.global_position) and target.is_falling:
+			resource_nodes.erase(target)
+	elif target.has_method("take_pickaxe_hit"):
+		if player.global_position.distance_to(target.global_position) > MINE_RANGE + 0.4:
+			return
+		if target.take_pickaxe_hit(player.global_position) and target.is_depleted:
+			resource_nodes.erase(target)
+
+func _select_tool(tool_name: String) -> void:
+	if not TOOL_LABELS.has(tool_name) or attack_remaining > 0.0:
 		return
-	if target.take_axe_hit(player.global_position) and target.is_falling:
-		resource_nodes.erase(target)
+	active_tool = tool_name
+	if equipped_axe != null:
+		equipped_axe.visible = tool_name == "axe"
+	if equipped_pickaxe != null:
+		equipped_pickaxe.visible = tool_name == "pickaxe"
+	if hud != null:
+		_update_hud()
 
 
 func _make_player() -> void:
@@ -662,7 +816,7 @@ func _start_attack() -> void:
 	animator.play(attack_clip, 0.05)
 	# Stationary axe swings should face the tree/camera direction as well.
 	visuals.rotation.y = yaw + PI + deg_to_rad(character_facing_offset)
-	pending_chop_target = _nearest_choppable_tree()
+	pending_chop_target = _nearest_choppable_tree() if active_tool == "axe" else _nearest_mineable_rock()
 	pending_chop_timer = CHOP_IMPACT_DELAY if pending_chop_target != null else 0.0
 
 
@@ -854,7 +1008,7 @@ func _measure_model_bounds(model: Node3D) -> AABB:
 
 func _make_axe() -> void:
 	# Char1 FBX mesh'i oyun boyuna normalize ediliyor. Ayni olcek el kemigine
-	# eklenen ekipmana da uygulanir; karsilastirma yapmadan balta ~1 cm kalir.
+	# eklenen ekipmana da uygulanir; karsilastirma yapmadan alet ~1 cm kalir.
 	var mount: Node3D = visuals
 	var hand_bone := ""
 	if skeleton != null:
@@ -870,24 +1024,45 @@ func _make_axe() -> void:
 			attachment.bone_name = hand_bone
 			skeleton.add_child(attachment)
 			mount = attachment
-	var axe := AXE_SCRIPT.new()
-	axe.name = "StarterAxe"
-	mount.add_child(axe)
-	equipped_axe = axe
 	axe_attachment = mount
-	# Mount her rigde farkli unit-scale tasiyabilir (cm -> metre). Balta
-	# uzunlugu dunya koordinatlarinda ~0.8 m kalmali ve el ile hareket etmeli.
+	equipped_axe = _make_tool(mount, "hand_axe", "StarterAxe", 0.80)
+	if equipped_axe == null:
+		# Meshy balta yuklenemezse prosedurel balta kullanilir.
+		equipped_axe = AXE_SCRIPT.new()
+		equipped_axe.name = "StarterAxe"
+		mount.add_child(equipped_axe)
+		_place_tool(mount, equipped_axe)
+	equipped_pickaxe = _make_tool(mount, "pickaxe", "StarterPickaxe", 0.85)
+	_select_tool("axe")
+	print("Ashvale equipped tools: mount=", hand_bone if not hand_bone.is_empty() else "fallback", " axe=", equipped_axe.get_meta("model_key", "procedural"), " pickaxe=", equipped_pickaxe != null, " world_scale=", equipped_axe.global_transform.basis.get_scale())
+
+func _make_tool(mount: Node3D, model_key: String, tool_name: String, length: float) -> Node3D:
+	var model := MODEL_LIBRARY.instantiate(model_key, length)
+	if model == null:
+		return null
+	var tool := Node3D.new()
+	tool.name = tool_name
+	tool.set_meta("model_key", model_key)
+	# Meshy aletleri sap asagi, bas yukari duruyor. Tutus noktasi sapin alt ceyregi.
+	model.position.y -= length * 0.3
+	tool.add_child(model)
+	mount.add_child(tool)
+	_place_tool(mount, tool)
+	return tool
+
+func _place_tool(mount: Node3D, tool: Node3D) -> void:
+	# Mount her rigde farkli unit-scale tasiyabilir (cm -> metre). Alet
+	# dunya koordinatlarinda gercek boyunda kalmali ve el ile hareket etmeli.
 	var mount_scale := mount.global_transform.basis.get_scale()
 	var inherited_scale := maxf((mount_scale.x + mount_scale.y + mount_scale.z) / 3.0, 0.0001)
 	var unit_correction := 1.0 / inherited_scale
-	axe.scale = Vector3.ONE * unit_correction
+	tool.scale = Vector3.ONE * unit_correction
 	if mount is BoneAttachment3D:
-		axe.position = Vector3(0.02, -0.12, 0.05) * unit_correction
-		axe.rotation_degrees = Vector3(87, 0, -12)
+		tool.position = Vector3(0.02, -0.12, 0.05) * unit_correction
+		tool.rotation_degrees = Vector3(87, 0, -12)
 	else:
-		axe.position = Vector3(0.43, 1.15, -0.20) * unit_correction
-		axe.rotation_degrees = Vector3(0, -12, -24)
-	print("Ashvale equipped axe: mount=", hand_bone if not hand_bone.is_empty() else "fallback", " inherited_scale=", inherited_scale, " world_scale=", axe.global_transform.basis.get_scale())
+		tool.position = Vector3(0.43, 1.15, -0.20) * unit_correction
+		tool.rotation_degrees = Vector3(0, -12, -24)
 
 
 func _make_camera() -> void:
@@ -915,6 +1090,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_E:
 		_collect_resource()
+	if event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_1 or event.keycode == KEY_2):
+		_select_tool("axe" if event.keycode == KEY_1 else "pickaxe")
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE

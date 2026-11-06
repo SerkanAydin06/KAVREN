@@ -11,6 +11,8 @@ const BARK := Color("#493325")
 const BARK_HIGHLIGHT := Color("#755039")
 const CUT_WOOD := Color("#d6ad74")
 const SPLINTER := Color("#b27d4f")
+const MODEL_LIBRARY := preload("res://scripts/model_library.gd")
+const STUMP_HEIGHT := 0.75
 
 var hits_taken: int = 0
 var is_falling: bool = false
@@ -147,6 +149,26 @@ func _add_stump() -> void:
 	stump.name = name + "_Stump"
 	parent_node.add_child(stump)
 	stump.global_position = global_position
+	stump.rotation.y = rotation.y
+	# Meshy kutuk modeli; yuklenemezse basit silindir kutuge duser.
+	var stump_model := MODEL_LIBRARY.instantiate("tree_stump", STUMP_HEIGHT)
+	if stump_model != null:
+		stump.add_child(stump_model)
+	else:
+		_add_primitive_stump(stump)
+	var body := StaticBody3D.new()
+	body.name = "StumpBody"
+	stump.add_child(body)
+	var collision := CollisionShape3D.new()
+	collision.name = "CollisionShape3D"
+	var shape := CylinderShape3D.new()
+	shape.height = 0.58
+	shape.radius = 0.45
+	collision.shape = shape
+	collision.position.y = 0.29
+	body.add_child(collision)
+
+func _add_primitive_stump(stump: Node3D) -> void:
 	var outer := CylinderMesh.new()
 	outer.radial_segments = 9
 	outer.height = 0.60
@@ -169,17 +191,6 @@ func _add_stump() -> void:
 	top.position.y = 0.61
 	top.material_override = _material(CUT_WOOD)
 	stump.add_child(top)
-	var body := StaticBody3D.new()
-	body.name = "StumpBody"
-	stump.add_child(body)
-	var collision := CollisionShape3D.new()
-	collision.name = "CollisionShape3D"
-	var shape := CylinderShape3D.new()
-	shape.height = 0.58
-	shape.radius = 0.45
-	collision.shape = shape
-	collision.position.y = 0.29
-	body.add_child(collision)
 
 func _material(tint: Color) -> StandardMaterial3D:
 	var result := StandardMaterial3D.new()

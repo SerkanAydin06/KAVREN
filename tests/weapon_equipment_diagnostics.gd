@@ -20,12 +20,17 @@ func _run() -> void:
 		return
 	var mesh_count := 0
 	var total_faces := 0
-	for child in axe.get_children():
-		if child is MeshInstance3D:
+	var pending: Array[Node] = [axe]
+	while not pending.is_empty():
+		var current: Node = pending.pop_back()
+		if current is MeshInstance3D:
 			mesh_count += 1
-			var part: MeshInstance3D = child as MeshInstance3D
+			var part: MeshInstance3D = current as MeshInstance3D
 			if part.mesh != null:
 				total_faces += int(part.mesh.get_faces().size() / 3)
+		for child in current.get_children():
+			pending.append(child)
+	var model_key := String(axe.get_meta("model_key", "procedural"))
 	var world_scale: Vector3 = axe.global_transform.basis.get_scale()
 	var hand_distance := axe.global_position.distance_to(mount.global_position)
 	var hand_name := ""
@@ -39,9 +44,12 @@ func _run() -> void:
 		failures += 1
 	if hand_distance > 0.35:
 		failures += 1
-	if mesh_count < 5 or total_faces < 15:
+	# Meshy hand_axe modeli kullanilmali; prosedurel balta sadece yedek.
+	if model_key != "hand_axe" or mesh_count < 1 or total_faces < 1000:
 		failures += 1
-	if axe.get_node_or_null("Handle") == null or axe.get_node_or_null("AxeHead") == null or axe.get_node_or_null("CuttingEdge") == null:
+	# Kazma da ayni ele takili, ama balta seciliyken gizli olmali.
+	var pickaxe: Node3D = game.equipped_pickaxe
+	if pickaxe == null or pickaxe.get_parent() != mount or pickaxe.visible:
 		failures += 1
-	print("AshvaleWeaponTest bone=", hand_name, " world_scale=", world_scale, " hand_distance=", hand_distance, " meshes=", mesh_count, " triangles=", total_faces, " failures=", failures)
+	print("AshvaleWeaponTest bone=", hand_name, " world_scale=", world_scale, " hand_distance=", hand_distance, " model=", model_key, " meshes=", mesh_count, " triangles=", total_faces, " failures=", failures)
 	quit(1 if failures > 0 else 0)
