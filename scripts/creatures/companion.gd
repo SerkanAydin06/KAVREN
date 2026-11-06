@@ -75,7 +75,7 @@ func _blob(center: Vector3, shape_scale: Vector3, color: Color) -> MeshInstance3
 
 func _process(delta: float) -> void:
 	phase += delta
-	visual.position.y = absf(sin(phase*2.7))*0.045 if not tired else 0
+	visual.position.y = absf(sin(phase*2.7))*0.045 if not tired else 0.0
 	visual.rotation.z = sin(phase*1.2)*0.035
 	visual.scale.y = 0.79 if tired else 1.0
 	label.text = SPECIES[species].name + (" · Yoldaş" if bonded else (" · Dinleniyor" if tired else ""))

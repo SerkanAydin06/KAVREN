@@ -451,7 +451,7 @@ func _refresh_interface() -> void:
 		goal = "Filizik'i antrenmanla seviye 2 yap" if levels[0]<2 else "Sarmaşık kapıya git · F ile Filizik'e yardım et"
 	if discovered:
 		goal = "Çiçekli açıklık keşfedildi!"
-	journal.text = "ASHVALE · YOLDAŞLAR VADİSİ\n"+goal
+	journal.text = "FİLİZYA · YOLDAŞLAR VADİSİ\n"+goal
 	var team := "Ekibin henüz boş"
 	if not roster.is_empty():
 		team = "Yoldaş · "+COMPANION.SPECIES[active_species].name+"  Sv."+str(levels[active_species])+"  Deneyim "+str(experience[active_species])+"/"+str(levels[active_species]*10)

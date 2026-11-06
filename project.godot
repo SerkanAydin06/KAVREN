@@ -14,7 +14,9 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 [application]
 
-config/name="Ashvale - Survival RPG Prototype"
+config/name="Filizya"
+config/use_custom_user_dir=true
+config/custom_user_dir_name="Ashvale - Survival RPG Prototype"
 run/main_scene="res://creature_valley.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
