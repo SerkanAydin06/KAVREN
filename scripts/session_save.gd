@@ -25,7 +25,7 @@ static func capture(game: Node) -> Dictionary:
 		"version": 1, "slots": game.inventory.slots.duplicate(true),
 		"selected": game.selected_slot, "position": game.player.global_position,
 		"yaw": game.yaw, "pitch": game.pitch, "health": game.health,
-		"stamina": game.stamina, "hour": game.atmosphere.hour,
+		"stamina": game.stamina, "sprint_exhausted": game.sprint_exhausted, "hour": game.atmosphere.hour,
 		"survival": {"fuel": fuel, "warmth": game.warmth, "night_started": game.night_started,
 			"night_failed": game.night_failed, "survived": game.survived_first_night},
 		"fires": game.fire_positions.slice(1), "spent": spent, "ferns": ferns,
@@ -59,6 +59,8 @@ static func read_state(path := PATH) -> Dictionary:
 		if not slot.get("count") is int or slot.count < 1 or slot.count > ITEMS.stack_size(slot.id):
 			return {}
 	if not data.get("selected") is int or data.selected < 0 or data.selected >= INVENTORY.HOTBAR_SIZE:
+		return {}
+	if not data.get("sprint_exhausted", false) is bool:
 		return {}
 	for key in ["yaw", "pitch", "hour", "health", "stamina"]:
 		if not data.get(key) is float or not is_finite(data[key]):
@@ -110,6 +112,7 @@ static func restore(game: Node, data: Dictionary) -> void:
 	game.camera_pivot.rotation = Vector3(game.pitch, game.yaw, 0)
 	game.health = clampf(data.health, 0, game.MAX_HEALTH)
 	game.stamina = clampf(data.stamina, 0, 100)
+	game.sprint_exhausted = data.get("sprint_exhausted", game.stamina <= 1.0)
 	game.atmosphere.set_hour(data.hour)
 	for spot in data.fires:
 		game._add_placed_fire(spot)
