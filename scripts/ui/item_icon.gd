@@ -79,11 +79,11 @@ func _tier() -> int:
 	return 1
 
 func _draw_wood() -> void:
-	for log in [[Vector2(10, 40), Vector2(48, 30)], [Vector2(16, 48), Vector2(54, 40)]]:
-		_line(log[0], log[1], WOOD, 11.0)
-		_line(log[0] + Vector2(2, -2), log[1] + Vector2(-2, -2), WOOD_DARK, 2.0)
-		_circle(log[1], 5.6, WOOD_CUT)
-		draw_arc(_p(log[1].x, log[1].y), 3.0 * _s(), 0, TAU, 16, WOOD, 1.2 * _s(), true)
+	for log_segment in [[Vector2(10, 40), Vector2(48, 30)], [Vector2(16, 48), Vector2(54, 40)]]:
+		_line(log_segment[0], log_segment[1], WOOD, 11.0)
+		_line(log_segment[0] + Vector2(2, -2), log_segment[1] + Vector2(-2, -2), WOOD_DARK, 2.0)
+		_circle(log_segment[1], 5.6, WOOD_CUT)
+		draw_arc(_p(log_segment[1].x, log_segment[1].y), 3.0 * _s(), 0, TAU, 16, WOOD, 1.2 * _s(), true)
 
 func _draw_rock(base: Color, light: Color, specks: Array) -> void:
 	_poly(PackedVector2Array([Vector2(12, 46), Vector2(16, 26), Vector2(28, 14), Vector2(44, 16), Vector2(54, 30), Vector2(52, 46), Vector2(32, 52)]), base)

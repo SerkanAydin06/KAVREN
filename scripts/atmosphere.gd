@@ -238,7 +238,7 @@ func set_hour(value: float) -> void:
 
 func clock_text() -> String:
 	var minutes := int(hour * 60.0) % (24 * 60)
-	return "%02d:%02d" % [minutes / 60, minutes % 60]
+	return "%02d:%02d" % [floori(minutes / 60.0), minutes % 60]
 
 func is_night() -> bool:
 	return sun_direction().y < -0.02
