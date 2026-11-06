@@ -47,9 +47,13 @@ Godot **4.7.x** (önerilen: 4.7.2) ile oluşturulmuş, üçüncü şahıs keşif
 - **Dekor:** 36 eğrelti otu (gölgesiz, 40 m sonra gizlenir) ve 5 eski kütük
 - Tam ekranda okunabilir, ekran köşelerine bağlı HUD
 
+- **Envanter ve üretim:** 24 yuva, 6 hızlı seçim yuvası ve 9 tarif. Bakır kazmayla demir çıkarılabilir. Meşale elde taşınır, kamp ateşi uygun zemine kurulabilir.
+- **Otomatik kayıt:** Eşya değişikliklerinde, tamamlanan hasatta, 30 saniyede bir ve normal pencere kapanışında kaydedilir. Sonraki açılışta aynı konum, çanta, saat, kamp ateşleri, tüketilmiş ağaç/kayalar, yerde kalan parçalar ve liflerin büyüme süreleri geri yüklenir.
+- Envanter açıkken hareket, zıplama ve dünya etkileşimleri durur. Oyuncu arazinin kenarında durur, zeminin altına düşerse başlangıç noktasına döner.
+
 ## Henüz bulunmayan sistemler
 
-Envanter ekranı, eşya üretimi (crafting), savaş, düşman yapay zekâsı, açlık/susuzluk, kayıt/yükleme sistemi.
+Savaş, düşman yapay zekâsı, açlık ve susuzluk.
 
 ## Klasör yapısı ve dosya adları
 
