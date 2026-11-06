@@ -25,8 +25,6 @@ func _ready() -> void:
 	rock.name = "StylizedBoulder"
 	rock.position = Vector3(4.5, 0, -8.5)
 	add_child(rock)
-	_create_label(oak, "STILIZE MESE", Vector3(0, 7.9, 0))
-	_create_label(rock, "STILIZE KAYA", Vector3(0, 2.45, 0))
 
 func _material(color: Color) -> StandardMaterial3D:
 	var mat := StandardMaterial3D.new()

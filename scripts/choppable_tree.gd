@@ -18,7 +18,9 @@ const CHOP_NOTCH_SCRIPT := preload("res://scripts/chop_notch.gd")
 const CHOP_HEIGHT := 0.95
 
 static var _triangle_cache: Dictionary = {}
-var _notch: MeshInstance3D = null
+var _notch: Node3D = null
+var _notch_surface := Vector3.ZERO
+var _notch_outward := Vector3.FORWARD
 
 var hits_taken: int = 0
 var is_falling: bool = false
@@ -105,12 +107,14 @@ static func _triangle_mesh(mesh: Mesh) -> TriangleMesh:
 
 func _update_notch(impact: Dictionary) -> void:
 	if _notch == null:
+		# Gercek derinlikli oyulmus centik. (Decal denendi: duz ve soluk kaldi.)
 		_notch = CHOP_NOTCH_SCRIPT.new()
 		_notch.name = "ChopNotch"
 		add_child(_notch)
 		_notch.configure(float(impact["radius"]))
-		var outward: Vector3 = impact["outward"]
-		_notch.global_transform = Transform3D(Basis.looking_at(-outward, Vector3.UP), Vector3(impact["point"]))
+		_notch_surface = Vector3(impact["point"])
+		_notch_outward = Vector3(impact["outward"])
+		_notch.global_transform = Transform3D(Basis.looking_at(-_notch_outward, Vector3.UP), _notch_surface)
 	_notch.set_progress(float(hits_taken) / float(MAX_HITS))
 
 func _emit_splinters(impact: Dictionary) -> void:

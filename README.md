@@ -30,6 +30,7 @@ Godot **4.7.x** (önerilen: 4.7.2) ile oluşturulmuş, üçüncü şahıs keşif
 | R | Öldükten sonra kampta yeniden doğ |
 | E | Yerdeki odun, taş, bakır veya demir parçasını topla |
 | Esc | Fareyi serbest bırak / yakala |
+| T | Saati 1 saat ileri sar |
 | F11 | Tam ekran / pencere |
 
 ## Şu anda çalışan sistemler
@@ -250,3 +251,27 @@ Char1 FBX iskelet/modeli genellikle santimetre ölçeğiyle geliyor. Oyuncu mode
   - Projede Compatibility renderer olduğu için decal kullanılamıyor; çentik shader'da kendi görüş ışını boyunca kameraya çekilerek kabuğun önünde çizilir, ekranda oyulmuş gibi görünür.
 - Kıymıklar artık darbe noktasından oyuncu tarafına sıçrar, yere düşüp kaybolur (eskiden ağacın dönüşüne göre yanlış taraftan çıkabiliyordu).
 - CI düzeltmesi: karakter animasyon testi oyuncuyu zemine oturtmadan durum geçişlerini sınıyordu ve ara sıra düşüş pozunu görüp kırılıyordu.
+
+## Forward+ görüntü kalitesi, gün-gece döngüsü ve kamp ateşi — 2026-11-06
+
+**Renderer:** Compatibility (OpenGL 3) → **Forward+** (Vulkan / DirectX 12). DirectX 12 veya Vulkan destekleyen bir ekran kartı gerekir.
+
+**Proje ayarları** (`project.godot`): TAA kenar yumuşatma, 8192 px yönlü gölge haritası ve en yüksek yumuşak gölge filtresi, 16× anizotropik doku filtresi, yüksek SSAO/SSIL kalitesi.
+
+**Atmosfer** (`scripts/atmosphere.gd`):
+- Kendi gökyüzü shader'ı: saate göre gökyüzü ve ufuk rengi, gün batımında güneş tarafında turuncu ufuk, güneş diski ve halesi, ay, gece yanıp sönen yıldızlar, rüzgârla kayan iki katmanlı prosedürel bulutlar. Bulutluluk birkaç dakikada bir yavaşça değişir.
+- Gün-gece döngüsü: 1 oyun günü = 24 gerçek dakika (`day_length_minutes`), oyun 08:30'da başlar. Gün 05:30–19:30. Güneş/ay yönü, ışık rengi ve şiddeti saate göre değişir; HUD'da **SAAT** gösterilir, **T** ile 1 saat ileri sarılır.
+- Işık: SDFGI (dolaylı ışık), SSIL, SSAO (temas gölgeleri), yumuşak kenarlı PCSS güneş gölgeleri (4 bölmeli), AgX ton eşleme, glow, hafif renk ayarı.
+- Hava: mesafe sisi + hava perspektifi, güneş ışınlı hacimsel sis; sabah 04:00–09:30 arası sis yoğunlaşır, öğleye doğru açılır.
+
+**Kamp ateşi** (`scripts/campfire.gd`): taş halka, kül, tipi tarzı kütükler, parlayan közler, titreyen gölgeli turuncu ışık (gece çevreyi aydınlatır), alev, rüzgârla sürüklenen duman ve uçuşan kıvılcım parçacıkları.
+
+**Diğer:**
+- Zemin 600 m'ye büyütüldü (ufukta kenar görünmüyor).
+- Eski sanat önizlemesi etiketleri kaldırıldı.
+- Balta çentiği Forward+'ta doğrusal renk uzayına ve ışık/gölge hesabına uyarlandı; yandan bakınca gövdenin arkasında kalır.
+- Decal denendi ama düz ve soluk kaldı; derinlikli geometrik çentik korundu.
+
+**Test:** `tests/atmosphere_diagnostics.gd` (CI'de çalışır).
+
+**Performans notu:** SDFGI, hacimsel sis ve PCSS gölgeler en pahalı ayarlar. Oyun takılırsa sırasıyla `environment.sdfgi_enabled`, `volumetric_fog_enabled` ve `sun.light_angular_distance` (`scripts/atmosphere.gd`) kısılabilir; en büyük kazanç yine Meshy modellerinin düşük poligonlu sürümlerinden gelir.
