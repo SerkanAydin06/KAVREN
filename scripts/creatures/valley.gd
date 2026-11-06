@@ -87,6 +87,8 @@ func _make_valley() -> void:
 	add_child(ground)
 	var display := MeshInstance3D.new()
 	display.mesh = mesh
+	# The open meadow receives character and tree shadows without projecting its own depth pattern.
+	display.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var mat := ShaderMaterial.new()
 	mat.shader = GROUND_SHADER
 	mat.set_shader_parameter("ground_albedo",GROUND_ALBEDO)
