@@ -31,11 +31,11 @@ void fragment() {
     }
     float angle = abs(dot(normalize(NORMAL), normalize(VIEW)));
     float outline = 1.0 - smoothstep(ink_width, ink_width + max(fwidth(angle), 0.03), angle);
-    ALBEDO = mix(base, base * vec3(0.30, 0.37, 0.46), outline * 0.90);
+    ALBEDO = mix(base, base * vec3(0.30, 0.37, 0.46), outline * 0.62);
     ROUGHNESS = 1.0;
 }
 
 void light() {
-    float band = smoothstep(0.19, 0.24, dot(NORMAL, LIGHT));
+    float band = smoothstep(0.12, 0.34, dot(normalize(NORMAL), LIGHT));
     DIFFUSE_LIGHT += ATTENUATION * LIGHT_COLOR * mix(0.11, 0.85, band) / PI;
 }
