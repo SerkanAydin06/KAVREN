@@ -25,4 +25,17 @@ func _capture() -> void:
 		if picture==null or picture.save_png(folder+"/"+view[0]+".png")!=OK:
 			quit(1)
 			return
+	scene.player.position = scene.creatures[0].position
+	scene._interact()
+	scene._interact()
+	scene.player.position = scene.creatures[1].position+Vector3(0,0,1.5)
+	scene._interact()
+	scene._refresh_interface()
+	camera.position = scene.creatures[1].position+Vector3(2,2.4,5)
+	camera.look_at(scene.creatures[1].position+Vector3.UP)
+	for i in range(12):
+		await RenderingServer.frame_post_draw
+	if root.get_texture().get_image().save_png(folder+"/training.png")!=OK:
+		quit(1)
+		return
 	quit()

@@ -47,6 +47,7 @@ func _make_valley() -> void:
 	add_child(atmosphere)
 	atmosphere.set_hour(10.0)
 	atmosphere.time_flows = false
+	_make_horizon()
 	var tool := SurfaceTool.new()
 	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var n := 80
@@ -131,6 +132,29 @@ func _make_valley() -> void:
 	_solid(Vector3(-5.1,gate_y+2,-33),Vector3(0.65,4,0.8),Color("#86634c"))
 	_solid(Vector3(5.1,gate_y+2,-33),Vector3(0.65,4,0.8),Color("#86634c"))
 
+func _make_horizon() -> void:
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in range(72):
+		var a := i*TAU/72
+		var b := (i+1)*TAU/72
+		var pa := Vector3(cos(a)*95,18+6*sin(a*5)+3*cos(a*9),sin(a)*95)
+		var pb := Vector3(cos(b)*95,18+6*sin(b*5)+3*cos(b*9),sin(b)*95)
+		var foot_a := Vector3(pa.x,-6,pa.z)*0.85
+		var foot_b := Vector3(pb.x,-6,pb.z)*0.85
+		for vertex in [foot_a,pb,pa,foot_a,foot_b,pb]:
+			tool.add_vertex(vertex)
+	tool.generate_normals()
+	var ridge := MeshInstance3D.new()
+	ridge.mesh = tool.commit()
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color("#8bb6bd")
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.diffuse_mode = BaseMaterial3D.DIFFUSE_TOON
+	ridge.material_override = mat
+	ridge.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(ridge)
+
 func _prop_blob(pos: Vector3, dimensions: Vector3, tint: Color) -> MeshInstance3D:
 	var node := MeshInstance3D.new()
 	var mesh := SphereMesh.new()
@@ -180,18 +204,32 @@ func _make_companions() -> void:
 func _make_interface() -> void:
 	var canvas := CanvasLayer.new()
 	add_child(canvas)
+	var frame := PanelContainer.new()
+	frame.position = Vector2(24,22)
+	frame.custom_minimum_size.x = 610
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.035,0.09,0.13,0.86)
+	style.set_corner_radius_all(14)
+	style.set_content_margin_all(18)
+	frame.add_theme_stylebox_override("panel",style)
+	canvas.add_child(frame)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation",10)
+	frame.add_child(stack)
 	journal = Label.new()
-	journal.position = Vector2(28,22)
-	journal.add_theme_font_size_override("font_size",22)
-	canvas.add_child(journal)
+	journal.add_theme_font_size_override("font_size",23)
+	journal.add_theme_color_override("font_color",Color("#ffe2a0"))
+	stack.add_child(journal)
 	panel = Label.new()
-	panel.position = Vector2(28,112)
-	panel.add_theme_font_size_override("font_size",19)
-	canvas.add_child(panel)
+	panel.custom_minimum_size.x = 574
+	panel.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	panel.add_theme_font_size_override("font_size",18)
+	stack.add_child(panel)
 	prompt = Label.new()
-	prompt.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	prompt.position = Vector2(28,570)
-	prompt.add_theme_font_size_override("font_size",20)
+	prompt.position = Vector2(28,740)
+	prompt.add_theme_font_size_override("font_size",23)
+	prompt.add_theme_color_override("font_outline_color",Color("#183b46"))
+	prompt.add_theme_constant_override("outline_size",6)
 	canvas.add_child(prompt)
 
 func _nearest_creature() -> int:
