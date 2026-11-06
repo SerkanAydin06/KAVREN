@@ -1,18 +1,194 @@
 name: Godot project smoke test
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
 jobs:
-  validate:
+  godot-validation:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-      - name: Start the project with Godot 4.7.2
+      # Modeller ve dokular Git LFS'te. LFS bant genisligi kotasini korumak
+      # icin indirilen nesneler, dosya listesinin ozetiyle onbellege alinir.
+      - name: List Git LFS objects
+        run: git lfs ls-files --long | cut -d ' ' -f1 | sort > .lfs-assets-id
+      - name: Restore Git LFS cache
+        uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets-id') }}
+          restore-keys: lfs-
+      - name: Pull Git LFS objects
+        run: git lfs pull
+      - name: Download Godot 4.7.2
         shell: bash
         run: |
-          set -euo pipefail
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/godot.zip" https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip
-          unzip -qo "$RUNNER_TEMP/godot.zip" -d "$RUNNER_TEMP"
-          engine="$RUNNER_TEMP/Godot_v4.7.2-stable_linux.x86_64"
-          "$engine" --headless --editor --import 2>&1 | tee "$RUNNER_TEMP/import.log"
-          "$engine" --headless --quit-after 10 2>&1 | tee "$RUNNER_TEMP/play.log"
-          if grep -E 'SCRIPT ERROR|^ERROR:' "$RUNNER_TEMP/import.log" "$RUNNER_TEMP/play.log"; then exit 1; fi
+          curl -fL --retry 3 -o godot.zip "https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable/Godot_v4.7.2-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          chmod +x Godot_v4.7.2-stable_linux.x86_64
+      - name: Import project and check scripts
+        shell: bash
+        run: |
+          set -o pipefail
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --editor --import --quit 2>&1 | tee godot-import.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-import.log; then
+            echo "Godot import reported script errors"
+            exit 1
+          fi
+      - name: Run main scene for smoke test
+        shell: bash
+        run: |
+          set -o pipefail
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --quit-after 15 2>&1 | tee godot-smoke.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-smoke.log; then
+            echo "Godot scene reported script errors"
+            exit 1
+          fi
+          grep -F "Ashvale character: res://assets/characters/Char1/Walking.fbx" godot-smoke.log
+          grep -F "Ashvale animation imported: Idle" godot-smoke.log
+          grep -F "Ashvale animation imported: Run" godot-smoke.log
+          grep -F "Ashvale animation imported: Attack" godot-smoke.log
+          grep -F "Ashvale animation imported: Jump" godot-smoke.log
+          grep -F "Ashvale animation imported: Death" godot-smoke.log
+          grep -F "Ashvale style preview: stylized tree + rock added" godot-smoke.log
+          grep -F "Ashvale mineables:" godot-smoke.log
+          grep -F "Ashvale equipped tools: mount=mixamorig_RightHand axe=hand_axe pickaxe=true" godot-smoke.log
+
+      - name: Validate Char1 bone motion
+        shell: bash
+        run: |
+          set -o pipefail
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/character_animation_diagnostics.gd 2>&1 | tee godot-animation.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-animation.log; then
+            echo "Godot bone diagnostic reported script errors"
+            exit 1
+          fi
+
+      - name: Validate tiled ground material
+        shell: bash
+        run: |
+          set -o pipefail
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/ground_diagnostics.gd 2>&1 | tee godot-ground.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-ground.log; then
+            echo "Godot ground validation reported errors"
+            exit 1
+          fi
+          grep -F "AshvaleGroundTest passed:" godot-ground.log
+
+      - name: Validate Meshy tree imports and forest collision
+        shell: bash
+        run: |
+          set -o pipefail
+          ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/tree_diagnostics.gd 2>&1 | tee godot-forest.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-forest.log; then
+            echo "Forest import or resource test reported errors"
+            exit 1
+          fi
+          grep -F "AshvaleTreeTest failures=0" godot-forest.log
+
+      - name: Validate stylized tree and rock art direction preview
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 90s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/stylized_preview_diagnostics.gd 2>&1 | tee godot-style.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-style.log; then
+            echo "Stylized showcase validation reported errors"
+            exit 1
+          fi
+          grep -F "AshvaleStyleTest preview=true" godot-style.log
+
+      - name: Validate axe hits, falling trees and wood pickups
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 100s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/chopping_diagnostics.gd 2>&1 | tee godot-chopping.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-chopping.log; then
+            echo "Tree chopping integration reported errors"
+            exit 1
+          fi
+          grep -F "AshvaleChopTest hits=3 fall=true drops=3 stump=true preview_tree=true failures=0" godot-chopping.log
+
+      - name: Verify axe is visibly scaled and equipped to hand
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 100s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/weapon_equipment_diagnostics.gd 2>&1 | tee godot-weapon.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-weapon.log; then
+            echo "Equipped axe validation reported errors"
+            exit 1
+          fi
+          grep -F "AshvaleWeaponTest bone=" godot-weapon.log
+          grep -F "failures=0" godot-weapon.log
+
+      - name: Validate dedicated keyframed axe swing and impact timing
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 100s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/axe_swing_diagnostics.gd 2>&1 | tee godot-axe-animation.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-axe-animation.log; then
+            echo "Dedicated axe animation validation reported errors"
+            exit 1
+          fi
+          grep -E "AshvaleAxeSwingTest .*failures=0" godot-axe-animation.log
+
+      - name: Validate Meshy props, pickaxe mining and ore pickups
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 150s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/resource_props_diagnostics.gd 2>&1 | tee godot-props.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-props.log; then
+            echo "Resource prop validation reported errors"
+            exit 1
+          fi
+          grep -E "AshvalePropsTest mineables=.*failures=0" godot-props.log
+
+      - name: Validate jump timing, campfire damage, death and respawn
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 150s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/movement_diagnostics.gd 2>&1 | tee godot-movement.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-movement.log; then
+            echo "Movement validation reported errors"
+            exit 1
+          fi
+          grep -E "AshvaleMoveTest .*failures=0" godot-movement.log
+
+      - name: Validate Forward+ atmosphere, day-night cycle and campfire
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 150s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/atmosphere_diagnostics.gd 2>&1 | tee godot-atmosphere.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-atmosphere.log; then
+            echo "Atmosphere validation reported errors"
+            exit 1
+          fi
+          grep -E "AshvaleAtmosphereTest .*failures=0" godot-atmosphere.log
+
+      - name: Validate inventory, crafting, tool tiers and placement
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout 150s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/inventory_diagnostics.gd 2>&1 | tee godot-inventory.log
+          if grep -Ei "SCRIPT ERROR:|Parse Error:|ERROR:|SHADOWED_VARIABLE_BASE_CLASS" godot-inventory.log; then
+            echo "Inventory validation reported errors"
+            exit 1
+          fi
+          grep -E "AshvaleInventoryTest .*failures=0" godot-inventory.log
+
+      - name: Capture camp, trail and mine views
+        shell: bash
+        run: |
+          set -o pipefail
+          export XDG_DATA_HOME="$RUNNER_TEMP/ashvale-art-data"
+          timeout 180s xvfb-run -a ./Godot_v4.7.2-stable_linux.x86_64 --rendering-method gl_compatibility --audio-driver Dummy --windowed --resolution 960x540 --path . --script res://tests/valley_views.gd 2>&1 | tee valley-views.log
+          if grep -E 'SHADER ERROR|SCRIPT ERROR|^ERROR:' valley-views.log; then exit 1; fi
+      - name: Upload valley views
+        uses: actions/upload-artifact@v4
+        with:
+          name: ashvale-valley-views
+          path: ${{ runner.temp }}/ashvale-art-data/**/valley-views/*.png
+          if-no-files-found: error
+          retention-days: 5
