@@ -15,6 +15,7 @@ func _capture() -> void:
 	var views := [
 		["scout", Vector3(0.21, 1.70, 1.32), Vector3(0, 1.36, 0), 10.5],
 		["scout-back", Vector3(-0.76, 1.73, -2.55), Vector3(0, 1.13, 0), 10.5],
+		["camp-keyframe", Vector3(-0.3, 2.4, 4.7), Vector3(0, 2.7, -13), 9.0],
 		["camp", Vector3(0, 2.8, 5), Vector3(0, 3.4, -45), 8.5],
 		["trail", Vector3(6, 2.5, -27), Vector3(0, 4, -73), 11.0],
 		["mine", Vector3(-7, 2.8, -58), Vector3(0, 5, -78), 16.5],

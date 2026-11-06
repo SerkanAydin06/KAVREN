@@ -61,11 +61,11 @@ func _create_tree() -> Node3D:
 	tree.set_meta("resource_type", "wood")
 	tree.set_meta("tree_species", "StylizedOak")
 	tree.name = "StylizedOak"
-	tree.add_child(tree_visual())
+	tree.add_child(tree_visual(true))
 	_add_collision(tree, 0.55, 4.2, Vector3(0, 2.1, 0))
 	return tree
 
-static func tree_visual() -> Node3D:
+static func tree_visual(painted := false) -> Node3D:
 	var tree := Node3D.new()
 	tree.name = "Model"
 	_cylinder(tree, Vector3(0, 0, 0), Vector3(0.12, 4.8, 0.05), 0.56, 0.30, BARK, "Trunk")
@@ -97,7 +97,50 @@ static func tree_visual() -> Node3D:
 		leaves.height = 2.12
 		var cluster := _mesh(tree, leaves, foliage_locations[index], Vector3(1.15, 0.78, 1.07), leaf_colors[index], "Foliage_%d" % index)
 		cluster.rotation.y = float(index) * 0.52
+		if painted:
+			cluster.position.x = cluster.position.x * 1.28 - 0.48
+			cluster.scale *= Vector3(1.28, 0.87, 1.08)
+			cluster.material_override = _ink(leaf_colors[index], true)
+	if painted:
+		_leaf_sprays(tree)
+		for part in tree.get_children():
+			if part is MeshInstance3D and part.name != "LeafSprays" and not String(part.name).begins_with("Foliage"):
+				part.material_override = _ink(BARK_LIGHT if String(part.name).begins_with("Branch") else BARK)
 	return tree
+
+# A few tapered leaf silhouettes interrupt the round crowns. All sprays use one mesh.
+static func _leaf_sprays(tree: Node3D) -> void:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in range(13):
+		var angle := i * TAU / 13.0
+		var outward := Vector3(cos(angle), 0, sin(angle))
+		var tangent := Vector3(-outward.z, 0, outward.x)
+		var base := Vector3(-0.48, 5.45 + 0.30 * sin(3.0 * angle), 0) + Vector3(2.2 * outward.x, 0, 1.55 * outward.z)
+		for j in range(3):
+			var along := outward.rotated(Vector3.UP, (j - 1) * 0.46)
+			var root := base + along * 0.06
+			var middle := root + along * 0.30 + Vector3.UP * 0.09
+			var tip := root + along * (0.66 + 0.17 * cos(i + j)) - Vector3.UP * 0.19
+			var tint := LEAF_LIGHT if (i+j) % 3 == 0 else LEAF_MED
+			_triangle(surface, root, middle + tangent * 0.12, tip, tint)
+			_triangle(surface, root, tip, middle - tangent * 0.12, tint.darkened(0.12))
+	surface.generate_normals()
+	var sprays := MeshInstance3D.new()
+	sprays.name = "LeafSprays"
+	sprays.mesh = surface.commit()
+	sprays.material_override = _ink(Color.WHITE, false, true)
+	sprays.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	tree.add_child(sprays)
+
+static func _ink(tint: Color, leaves := false, facets := false) -> ShaderMaterial:
+	var mat := ShaderMaterial.new()
+	mat.shader = preload("res://assets/shaders/camp_ink.gdshader")
+	mat.set_shader_parameter("paint", tint)
+	mat.set_shader_parameter("foliage", leaves)
+	mat.set_shader_parameter("vertex_paint", facets)
+	mat.set_shader_parameter("ink_width", 0.115 if leaves else 0.065)
+	return mat
 
 func _add_collision(parent: Node3D, radius: float, height: float, center: Vector3) -> void:
 	var body := StaticBody3D.new()
@@ -142,17 +185,17 @@ static func _rock_mesh(radius: float, height: float, color_factor: float) -> Arr
 static func _triangle(tool: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, tint: Color) -> void:
 	tool.set_color(tint)
 	tool.add_vertex(a)
-	tool.add_vertex(b)
 	tool.add_vertex(c)
+	tool.add_vertex(b)
 
 func _create_rock() -> Node3D:
 	var rock := Node3D.new()
 	rock.name = "StylizedBoulder"
-	rock.add_child(rock_visual(true))
+	rock.add_child(rock_visual(true, true))
 	_add_collision(rock, 1.19, 1.48, Vector3(0, 0.74, 0))
 	return rock
 
-static func rock_visual(mossy: bool) -> Node3D:
+static func rock_visual(mossy: bool, painted := false) -> Node3D:
 	var rock := Node3D.new()
 	rock.name = "Model"
 	var stone_material := StandardMaterial3D.new()
@@ -161,7 +204,8 @@ static func rock_visual(mossy: bool) -> Node3D:
 	var main_stone := MeshInstance3D.new()
 	main_stone.name = "FacetedRock"
 	main_stone.mesh = _rock_mesh(1.54, 1.55, 0.75)
-	main_stone.material_override = stone_material
+	var facet_material: Material = _ink(Color.WHITE, false, true) if painted else stone_material
+	main_stone.material_override = facet_material
 	rock.add_child(main_stone)
 	for index in range(2):
 		var chip := MeshInstance3D.new()
@@ -169,7 +213,7 @@ static func rock_visual(mossy: bool) -> Node3D:
 		chip.mesh = _rock_mesh(0.46, 0.56, float(index))
 		chip.position = Vector3(-1.65 if index == 0 else 1.59, 0, 0.48 if index == 0 else -0.28)
 		chip.rotation.y = 0.5 * float(index)
-		chip.material_override = stone_material
+		chip.material_override = facet_material
 		rock.add_child(chip)
 	# Birkac duz yosun lekesi; fotogercekci kaplama gürültüsü yok.
 	var moss_mesh := SphereMesh.new()
