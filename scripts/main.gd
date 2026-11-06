@@ -192,6 +192,7 @@ const SAVE := preload("res://scripts/session_save.gd")
 const WORLD_LIMIT := GROUND_SIZE * 0.5 - 1.5
 var harvested := {}
 var save_elapsed := 0.0
+var hud_elapsed := 0.0
 var session_active := false
 var writable_session := true
 var checkpoint_pending := false
@@ -1776,7 +1777,10 @@ func _physics_process(delta: float) -> void:
 	_update_placement()
 	camera_pivot.global_position = camera_pivot.global_position.lerp(player.global_position + Vector3(0, 1.5, 0), minf(delta * 8.0, 1.0))
 	_update_gallery_camera()
-	_update_hud()
+	hud_elapsed += delta
+	if hud_elapsed >= 0.1:
+		hud_elapsed = 0.0
+		_update_hud()
 	if session_active:
 		save_elapsed += delta
 		if save_elapsed >= 30.0:

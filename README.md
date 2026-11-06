@@ -108,7 +108,7 @@ assets/
 
 FBX'e gömülü dokular içe aktarmada atılır (`fbx/embedded_image_handling=0`); dokular her zaman yanındaki PNG'lerden gelir. 4096 px dokular VRAM için 2048 px'e sınırlanır ve mipmap'lenir (`.import` dosyalarında `process/size_limit=2048`).
 
-**Performans notu:** Yeni Meshy modelleri çok yüksek poligonlu (eğrelti ~717 bin, demir cevheri ~386 bin, kütük ~300 bin üçgen). Godot otomatik LOD üretiyor, ancak Meshy'de **Remesh / düşük poligon (ör. 10–30 bin)** seçeneğiyle yeniden dışa aktarmak hem oyunu hem depo boyutunu ciddi rahatlatır.
+**Performans ölçümü:** Kamp ve ormanda aynı yöne bakarken FPS panelindeki kare süresi ve son tepe değerlerini karşılaştır.
 
 ## Git LFS
 
@@ -273,13 +273,13 @@ Char1 FBX iskelet/modeli genellikle santimetre ölçeğiyle geliyor. Oyuncu mode
 
 **Renderer:** Compatibility (OpenGL 3) → **Forward+** (Vulkan / DirectX 12). DirectX 12 veya Vulkan destekleyen bir ekran kartı gerekir.
 
-**Proje ayarları** (`project.godot`): TAA kenar yumuşatma, 8192 px yönlü gölge haritası ve en yüksek yumuşak gölge filtresi, 16× anizotropik doku filtresi, yüksek SSAO/SSIL kalitesi.
+**Performans ayarları:** 2048 px yönlü gölge haritası, iki güneş gölge bölgesi ve 3 piksel model detay eşiği.
 
 **Atmosfer** (`scripts/atmosphere.gd`):
 - Kendi gökyüzü shader'ı: saate göre gökyüzü ve ufuk rengi, gün batımında güneş tarafında turuncu ufuk, güneş diski ve halesi, ay, gece yanıp sönen yıldızlar, rüzgârla kayan iki katmanlı prosedürel bulutlar. Bulutluluk birkaç dakikada bir yavaşça değişir.
 - Gün-gece döngüsü: 1 oyun günü = 10 gerçek dakika (`day_length_minutes`), oyun 08:30'da başlar. Gün 05:30–19:30. Güneş/ay yönü, ışık rengi ve şiddeti saate göre değişir; HUD'da **SAAT** gösterilir, **T** ile 1 saat ileri sarılır.
-- Işık: SDFGI (dolaylı ışık), SSIL, SSAO (temas gölgeleri), yumuşak kenarlı PCSS güneş gölgeleri (4 bölmeli), AgX ton eşleme, glow, hafif renk ayarı.
-- Hava: mesafe sisi + hava perspektifi, güneş ışınlı hacimsel sis; sabah 04:00–09:30 arası sis yoğunlaşır, öğleye doğru açılır.
+- Işık: Gökyüzü ortam ışığı, yönlü güneş ve ay gölgeleri, AgX ton eşleme ve ateş parlaması.
+- Hava: mesafe sisi + hava perspektifi,  sabah 04:00–09:30 arası sis yoğunlaşır, öğleye doğru açılır.
 
 **Kamp ateşi** (`scripts/campfire.gd`): taş halka, kül, tipi tarzı kütükler, parlayan közler, titreyen gölgeli turuncu ışık (gece çevreyi aydınlatır), alev, rüzgârla sürüklenen duman ve uçuşan kıvılcım parçacıkları.
 
