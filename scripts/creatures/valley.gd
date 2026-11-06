@@ -17,6 +17,9 @@ var battle_camera: Camera3D
 var ally_origin := Vector3.ZERO
 var combat_card: PanelContainer
 var combat_text: Label
+var field_card: PanelContainer
+var ally_meter: ProgressBar
+var foe_meter: ProgressBar
 var friend_energy := 30
 var rival_energy := 24
 var turn_count := 0
@@ -211,6 +214,7 @@ func _make_interface() -> void:
 	var canvas := CanvasLayer.new()
 	add_child(canvas)
 	var frame := PanelContainer.new()
+	field_card = frame
 	frame.position = Vector2(24,22)
 	frame.custom_minimum_size.x = 610
 	var style := StyleBoxFlat.new()
@@ -232,14 +236,25 @@ func _make_interface() -> void:
 	panel.add_theme_font_size_override("font_size",18)
 	stack.add_child(panel)
 	combat_card = PanelContainer.new()
-	combat_card.position = Vector2(40,530)
-	combat_card.custom_minimum_size.x = 580
+	combat_card.anchor_left = 0.05
+	combat_card.anchor_right = 0.95
+	combat_card.anchor_top = 1.0
+	combat_card.anchor_bottom = 1.0
+	combat_card.offset_top = -200
+	combat_card.offset_bottom = -26
 	combat_card.add_theme_stylebox_override("panel",style)
 	canvas.add_child(combat_card)
 	combat_text = Label.new()
 	combat_text.add_theme_font_size_override("font_size",22)
 	combat_text.add_theme_color_override("font_color",Color("#ffdfac"))
-	combat_card.add_child(combat_text)
+	var battle_stack := VBoxContainer.new()
+	combat_card.add_child(battle_stack)
+	var meters := HBoxContainer.new()
+	meters.add_theme_constant_override("separation",30)
+	battle_stack.add_child(meters)
+	ally_meter = _strength_meter(meters,Color("#6ebaa7"))
+	foe_meter = _strength_meter(meters,Color("#d78a69"))
+	battle_stack.add_child(combat_text)
 	combat_card.hide()
 	prompt = Label.new()
 	prompt.position = Vector2(28,740)
@@ -247,6 +262,17 @@ func _make_interface() -> void:
 	prompt.add_theme_color_override("font_outline_color",Color("#183b46"))
 	prompt.add_theme_constant_override("outline_size",6)
 	canvas.add_child(prompt)
+
+func _strength_meter(row: HBoxContainer, tint: Color) -> ProgressBar:
+	var meter := ProgressBar.new()
+	meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meter.custom_minimum_size.y = 9
+	meter.show_percentage = false
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = tint
+	meter.add_theme_stylebox_override("fill",fill)
+	row.add_child(meter)
+	return meter
 
 func _nearest_creature() -> int:
 	var nearest := -1
@@ -316,7 +342,7 @@ func _begin_training(index: int) -> void:
 	var middle := (ally.position+rival.position)*0.5
 	battle_camera.position = middle + Vector3(1.3,2.1,5.0)
 	battle_camera.look_at(middle + Vector3.UP*0.75)
-	battle_camera.fov = 42
+	battle_camera.fov = 49
 	battle_camera.current = true
 	visuals.hide()
 	friend_energy = 30+levels[active_species]*5
@@ -560,6 +586,7 @@ func _physics_process(delta: float) -> void:
 		_checkpoint_creatures()
 
 func _refresh_interface() -> void:
+	field_card.visible = battle < 0
 	var goal := "Filizik ile dost ol · E ile meyve sun"
 	if roster.has(0):
 		goal = "Filizik ile bir saha karşılaşması kazan" if levels[0]<2 else "Sarmaşık kapıya git · F ile Filizik'e yardım et"
@@ -573,6 +600,10 @@ func _refresh_interface() -> void:
 	if battle >= 0:
 		prompt.text = ""
 		combat_card.show()
+		ally_meter.max_value = 30+levels[active_species]*5
+		ally_meter.value = friend_energy
+		foe_meter.max_value = 24+battle*4
+		foe_meter.value = maxi(0,rival_energy)
 		var shown_turn := turn_count if resolving else turn_count+1
 		var threat := "AĞIR VURUŞ" if shown_turn%3 == 0 else "Saldırı"
 		combat_text.text = "%s  %d   /   %s  %d\nRakibin niyeti · %s\n[1] %s     [2] Savun     [Esc] Çekil" % [COMPANION.SPECIES[active_species].name,friend_energy,COMPANION.SPECIES[battle].name,maxi(0,rival_energy),threat,COMPANION.SPECIES[active_species].move]
