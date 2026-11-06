@@ -85,5 +85,90 @@ func _run() -> void:
 		game._collect_resource()
 	if game.copper != before + chunks.size():
 		failures += 1
+	failures += await _test_expedition(game)
 	print("AshvalePropsTest mineables=", by_kind, " ferns=", ferns, " stumps=", stumps, " copper=", game.copper, " failures=", failures)
 	quit(1 if failures > 0 else 0)
+
+func _check(condition: bool, label: String) -> int:
+	if not condition:
+		print("Expedition regression: ", label)
+	return 0 if condition else 1
+
+func _test_expedition(game: Node) -> int:
+	var failures := 0
+	var entrance: Vector3 = game.MINE.ENTRANCE
+	await physics_frame
+	var space: PhysicsDirectSpaceState3D = game.get_world_3d().direct_space_state
+	var center := entrance + Vector3(0, 1.5, -12)
+	var passage := PhysicsRayQueryParameters3D.create(entrance + Vector3(0, 1.5, 4), center, 4)
+	failures += _check(space.intersect_ray(passage).is_empty(), "gallery entrance traversable")
+	var wall := PhysicsRayQueryParameters3D.create(center, center + Vector3.RIGHT * 6, 4)
+	failures += _check(not space.intersect_ray(wall).is_empty(), "gallery wall blocks passage")
+	game.camera_pivot.position = center
+	game.camera_pivot.rotation = Vector3(0, PI/2, 0)
+	game._update_gallery_camera()
+	failures += _check(game.camera_pivot.get_node("Camera").position.length() < 4, "camera stays inside gallery wall")
+	game.player.position = entrance
+	game._update_expedition()
+	failures += _check(game.expedition_stage == game.Expedition.FIND, "first night gate")
+	game.survived_first_night = true
+	game._update_expedition()
+	failures += _check(game.expedition_stage == game.Expedition.RETURN, "mine discovered")
+	game.inventory.set_count("copper", 0)
+	game._select_tool("pickaxe")
+	for index in range(3):
+		var seam: Node3D = game.get_node("MineCopper%d" % index)
+		game.player.position = seam.position + Vector3.BACK * (game._target_radius(seam) + 0.5)
+		game.yaw = 0
+		for hit in range(4):
+			game.attack_remaining = 0
+			game._start_attack()
+			game._advance_axe_impact(game.CHOP_IMPACT_DELAY + 0.01)
+		for chunk in game.resource_nodes.duplicate():
+			if chunk.get_meta("harvest_source", "") == str(seam.name):
+				game.player.position = chunk.position
+				game._collect_resource()
+	failures += _check(game.copper == 6, "entrance yields crafting materials")
+	var iron: Node3D = game.get_node(game.MINE.IRON_SOURCE)
+	game.player.position = iron.position + Vector3.BACK * (game._target_radius(iron) + 0.5)
+	game.attack_remaining = 0
+	game._start_attack()
+	game._advance_axe_impact(game.CHOP_IMPACT_DELAY + 0.01)
+	failures += _check(iron.hits_taken == 0, "stone pickaxe cannot mine gallery iron")
+	game.player.position = game.CAMP_POSITION
+	game._update_expedition()
+	failures += _check(game.expedition_stage == game.Expedition.MINE_IRON, "return with copper")
+	game.inventory.add("wood", 3)
+	game.inventory.add("rope", 1)
+	failures += _check(game.inventory.craft(game.ITEMS.recipe_for("copper_pickaxe")), "craft copper pickaxe")
+	for i in range(game.inventory.HOTBAR_SIZE):
+		if game.inventory.item_at(i) == "copper_pickaxe":
+			game.attack_remaining = 0
+			game._select_slot(i)
+	game.player.position = iron.position + Vector3.BACK * (game._target_radius(iron) + 0.5)
+	for hit in range(4):
+		game.attack_remaining = 0
+		game._start_attack()
+		game._advance_axe_impact(game.CHOP_IMPACT_DELAY + 0.01)
+	var path := "user://mine-test-only.save"
+	game.SAVE.write_state(game.SAVE.capture(game), path)
+	var saved: Dictionary = game.SAVE.read_state(path)
+	var resumed: Node = load("res://main.tscn").instantiate()
+	root.add_child(resumed)
+	resumed.set_physics_process(false)
+	if saved.is_empty():
+		failures += _check(false, "read expedition save")
+	else:
+		game.SAVE.restore(resumed, saved)
+		failures += _check(resumed.expedition_stage == game.Expedition.MINE_IRON and not resumed.mine_iron_collected, "resume before collecting iron")
+		for chunk in resumed.resource_nodes.duplicate():
+			if chunk.get_meta("harvest_source", "") == game.MINE.IRON_SOURCE:
+				resumed.player.position = chunk.position
+				resumed._collect_resource()
+				break
+		resumed._update_expedition()
+		failures += _check(resumed.expedition_stage == game.Expedition.COMPLETE and resumed.iron > 0, "collect restored mine iron to finish")
+	DirAccess.remove_absolute(path)
+	resumed.queue_free()
+	await process_frame
+	return failures
