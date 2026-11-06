@@ -38,6 +38,19 @@ func _capture() -> void:
 	scene.player.position = scene.creatures[0].position
 	scene._interact()
 	scene._interact()
+	scene.sheet.open_for(0)
+	for frame in range(4):
+		await RenderingServer.frame_post_draw
+	if root.get_texture().get_image().save_png(folder+"/attributes.png") != OK:
+		quit(1)
+		return
+	scene.sheet._page(true)
+	for frame in range(4):
+		await RenderingServer.frame_post_draw
+	if root.get_texture().get_image().save_png(folder+"/development.png") != OK:
+		quit(1)
+		return
+	scene._close_sheet()
 	scene.player.position = scene.creatures[1].position+Vector3(0,0,1.5)
 	scene._interact()
 	scene._refresh_interface()

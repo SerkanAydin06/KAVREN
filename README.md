@@ -13,3 +13,12 @@ Seviye 2 Filizik ile vadinin sarmaşık geçidinde F’ye basarak çiçekli aç�
 WASD hareket, fare kamera, Shift koşu, Space zıplama. F11 ekran modu.
 
 Bu ilk sürüm üç tür, sıra tabanlı dostça mücadele ve tek keşif hedefi içerir. Önceki hayatta kalma oyunu archive/survival-before-creatures dalındadır. Eski kayıt dosyası ayrı tutulur.
+
+
+### Yaratık gelişimi
+
+G ile yakalanan yaratıkların özelliklerini ve gelişim ağaçlarını inceleyebilirsin. İlk puan yakalamada, diğer yedi puan 2–8. seviyelerde gelir. Puan her yaratığa aittir. İki dalda da ilk kademeleri alabilir veya tek dala öncelik verebilirsin. Her dal sırasıyla bir pasif (1 puan), savaşta 4 veya 5 ile kullanılan bir aktif (2 puan) ve diğer dalın son kademesini kapatan bir ustalık (2 puan) içerir. Yeni aktifler kullanımdan sonra üç tur bekler. Temel saldırı, savunma ve ikinci seviye tür tekniği kendi tuşlarında kalır.
+
+Her türün ayrı bir başlangıç profili vardır. Damlup en yüksek öz havuzuyla, Filizik en hızlı kritik birikimiyle, Çakılcık en yüksek doğal direnciyle başlar. G → Nitelikler ekranında her puanın sağlayacağı yeni değer görünür. Yakalamada 2, her seviye artışında 2 nitelik puanı kazanılır. Dirim yatırımı +4 can, Öz +2 teknik kaynağı, Kudret +1 vuruş, Sezgi vuruş başına +2 kritik birikimi verir. Direnç yatırımı gelen hasarın bir yüzdesini azaltır ve yüksek değerlerde her ek puanın katkısı küçülür. Güç puanı toplam profili ve öğrenilmiş yetenekleri özetler.
+
+Savaş tam can ve özle açılır. 3 numaralı teknik 4 öz, ağaçtan öğrenilen teknikler 6 öz harcar. Savunma 4 öz yeniler. Saldırıların biriktirdiği Sezgi 100'e ulaştığında o vuruş %50 güçlenir, fazla birikim sonraki vuruşa taşınır. Eski kayıtlar mevcut seviyeleri kadar dağıtılabilir puanla devam eder.
