@@ -21,6 +21,7 @@ static func capture(game: Node) -> Dictionary:
 			var path: String = node.get_meta("harvest_source")
 			spent[path].append(node.global_position)
 	return {
+		"expedition_stage": game.expedition_stage, "mine_iron": game.mine_iron_collected,
 		"version": 1, "slots": game.inventory.slots.duplicate(true),
 		"selected": game.selected_slot, "position": game.player.global_position,
 		"yaw": game.yaw, "pitch": game.pitch, "health": game.health,
@@ -90,12 +91,16 @@ static func read_state(path := PATH) -> Dictionary:
 		for key in ["night_started", "night_failed", "survived"]:
 			if not survival.get(key) is bool:
 				return {}
+	if not data.get("expedition_stage", 0) is int or data.get("expedition_stage", 0) not in [0, 1, 2, 3] or not data.get("mine_iron", false) is bool:
+		return {}
 	return data
 
 static func _valid_point(value: Variant) -> bool:
 	return value is Vector3 and value.is_finite()
 
 static func restore(game: Node, data: Dictionary) -> void:
+	game.expedition_stage = data.get("expedition_stage", 0)
+	game.mine_iron_collected = data.get("mine_iron", false)
 	game.inventory.slots = data.slots.duplicate(true)
 	game.inventory.changed.emit()
 	game._select_slot(data.selected)

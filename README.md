@@ -57,6 +57,10 @@ Oyun 08:30’da başlar. 17:00’den sonra hava serinler, 19:30’da gece başla
 
 Kamp ateşi 150 saniyelik yakıtla başlar. Yaklaş ve **E** ile 1 odun ekle. Her odun 75 saniye yanar. Sönen ateşi aynı şekilde yeniden yakabilirsin. Geceyi hayatta tamamladığında şafakta bildirim görünür. Yakıt, vücut sıcaklığı ve ilk gece ilerlemesi otomatik kayda dahildir.
 
+## İkinci gün · Terk edilmiş maden
+
+İlk geceyi atlattığında kampın kuzeyindeki ahşap kaldırma kulesini ara. Girişteki üç bakır damarını taş kazmayla kırıp düşen parçaları **E** ile topla. Beş bakırla kampa dön. **Tab** menüsünde 5 bakır, 3 odun ve 1 ipten bakır kazma üret. Meşale kapalı galeriyi aydınlatır. Kazmaya geçip arka galerideki demiri kır ve en az bir parça topla. Seferin hangi aşamasında kaldığın kayıtla korunur.
+
 ## Henüz bulunmayan sistemler
 
 Savaş, düşman yapay zekâsı, açlık ve susuzluk.

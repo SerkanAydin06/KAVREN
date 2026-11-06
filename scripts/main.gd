@@ -168,6 +168,10 @@ var ui: CanvasLayer
 var torch: Node3D
 var placement_ghost: Node3D
 var placement_valid := false
+const MINE := preload("res://scripts/abandoned_mine.gd")
+enum Expedition { FIND, RETURN, MINE_IRON, COMPLETE }
+var expedition_stage := Expedition.FIND
+var mine_iron_collected := false
 var campfires: Array[Node3D] = []
 var warmth := 100.0
 var night_started := false
@@ -390,6 +394,10 @@ func _make_camp() -> void:
 		resource_nodes.append(tree)
 	print("Ashvale forest: ", TREE_COUNT, " trees / ", TREE_MODEL_PATHS.size(), " species")
 
+	var mine := MINE.new()
+	mine.name = "AbandonedMine"
+	mine.position = MINE.ENTRANCE
+	add_child(mine)
 	_make_mineables()
 	_make_ferns()
 	_make_decor_stumps()
@@ -417,46 +425,52 @@ func _make_mineables() -> void:
 	rock_random.seed = 20261105
 	for entry in placements:
 		var key := String(entry[0])
-		var config: Dictionary = ROCK_TYPES[key]
 		var index: int = counts.get(key, 0)
 		counts[key] = index + 1
-		var rock := MINEABLE_ROCK_SCRIPT.new()
-		rock.name = "%s_%02d" % [key.to_pascal_case(), index]
-		rock.resource_kind = String(config["kind"])
-		rock.max_hits = int(config["hits"])
-		rock.drop_count = int(config["drops"])
-		var angle: float = entry[1]
-		var distance: float = entry[2]
-		rock.position = Vector3(cos(angle) * distance, 0, sin(angle) * distance)
-		rock.rotation.y = rock_random.randf_range(0.0, TAU)
-		add_child(rock)
-		var height: float = float(config["height"]) * rock_random.randf_range(0.85, 1.15)
-		var model := MODEL_LIBRARY.instantiate(key, height)
-		var footprint := Vector3(height, height, height)
-		if model != null:
-			rock.add_child(model)
-			footprint = MODEL_LIBRARY.measure_bounds(model).size * model.scale.x
-		else:
-			var fallback := SphereMesh.new()
-			fallback.radius = height * 0.55
-			fallback.height = height
-			_add_primitive(rock, fallback, Vector3(0, height * 0.5, 0), Color(0.40, 0.43, 0.43))
-		var rock_body := StaticBody3D.new()
-		rock_body.name = "RockBody"
-		rock.add_child(rock_body)
-		var rock_collision := CollisionShape3D.new()
-		rock_collision.name = "CollisionShape3D"
-		var rock_shape := CylinderShape3D.new()
-		rock_shape.radius = maxf(minf(footprint.x, footprint.z) * 0.42, 0.25)
-		rock_shape.height = maxf(footprint.y, 0.3)
-		rock_collision.shape = rock_shape
-		rock_collision.position.y = rock_shape.height * 0.5
-		rock_body.add_child(rock_collision)
-		rock.set_meta("resource_type", "mineable")
-		rock.set_meta("rock_model", key)
-		rock.connect("resources_dropped", _register_drops.bind(rock))
-		resource_nodes.append(rock)
-	print("Ashvale mineables: ", counts)
+		var location := Vector3(cos(entry[1]), 0, sin(entry[1])) * float(entry[2])
+		_spawn_rock(key, "%s_%02d" % [key.to_pascal_case(), index], location, rock_random)
+	for index in range(3):
+		var offset := Vector3(-5.5 + index * 5, 0, 5 + index % 2 * 2)
+		_spawn_rock("copper_ore", "MineCopper%d" % index, MINE.ENTRANCE + offset, rock_random)
+	_spawn_rock("iron_ore", MINE.IRON_SOURCE, MINE.ENTRANCE + Vector3(0.8, 0, -16), rock_random)
+	print("Ashvale mineables: ", counts, " + 3 mine copper / 1 mine iron")
+
+func _spawn_rock(key: String, rock_name: String, location: Vector3, rock_random: RandomNumberGenerator) -> void:
+	var config: Dictionary = ROCK_TYPES[key]
+	var rock := MINEABLE_ROCK_SCRIPT.new()
+	rock.name = rock_name
+	rock.resource_kind = String(config["kind"])
+	rock.max_hits = int(config["hits"])
+	rock.drop_count = int(config["drops"])
+	rock.position = location
+	rock.rotation.y = rock_random.randf_range(0.0, TAU)
+	add_child(rock)
+	var height: float = float(config["height"]) * rock_random.randf_range(0.85, 1.15)
+	var model := MODEL_LIBRARY.instantiate(key, height)
+	var footprint := Vector3(height, height, height)
+	if model != null:
+		rock.add_child(model)
+		footprint = MODEL_LIBRARY.measure_bounds(model).size * model.scale.x
+	else:
+		var fallback := SphereMesh.new()
+		fallback.radius = height * 0.55
+		fallback.height = height
+		_add_primitive(rock, fallback, Vector3(0, height * 0.5, 0), Color(0.40, 0.43, 0.43))
+	var rock_body := StaticBody3D.new()
+	rock_body.name = "RockBody"
+	rock.add_child(rock_body)
+	var rock_collision := CollisionShape3D.new()
+	rock_collision.name = "CollisionShape3D"
+	var rock_shape := CylinderShape3D.new()
+	rock_shape.radius = maxf(minf(footprint.x, footprint.z) * 0.42, 0.25)
+	rock_shape.height = maxf(footprint.y, 0.3)
+	rock_collision.shape = rock_shape
+	rock_collision.position.y = rock_shape.height * 0.5
+	rock_body.add_child(rock_collision)
+	rock.set_meta("resource_type", "mineable")
+	rock.set_meta("rock_model", key)
+	rock.connect("resources_dropped", _register_drops.bind(rock))
+	resource_nodes.append(rock)
 
 func _make_ferns() -> void:
 	# Sadece dekor: carpisma yok, golge yok, uzakta gizlenir (Meshy egrelti cok poligonlu).
@@ -565,6 +579,8 @@ func _update_hud() -> void:
 			goal = "Gün doğana kadar sıcak kal." if not night_failed else "Bir sonraki geceye hazırlan."
 		else:
 			goal = "Akşam olmadan odun biriktir." if atmosphere.hour < 17 else "Hava soğuyor. Ateşe odun ekle."
+	else:
+		goal = _expedition_hint()
 	ui.set_survival(warmth, goal)
 	if atmosphere != null:
 		ui.set_clock(atmosphere.clock_text(), _night_now())
@@ -592,10 +608,16 @@ func _nearest_resource() -> Node3D:
 		if not String(node.get_meta("resource_type", "")).ends_with("_drop"):
 			continue
 		var distance := player.global_position.distance_to(node.global_position)
-		if distance < best_distance:
+		if distance < best_distance and _mine_path_clear(node):
 			best_distance = distance
 			best = node
 	return best
+
+func _mine_path_clear(node: Node3D) -> bool:
+	if node.position.distance_squared_to(MINE.ENTRANCE) > 40 * 40:
+		return true
+	var ray := PhysicsRayQueryParameters3D.create(player.global_position + Vector3.UP, node.global_position + Vector3.UP * 0.5, 4)
+	return get_world_3d().direct_space_state.intersect_ray(ray).is_empty()
 
 func _nearest_mineable_rock() -> Node3D:
 	return _nearest_melee_target("mineable", "take_pickaxe_hit")
@@ -637,7 +659,7 @@ func _nearest_melee_target(resource_type: String, hit_method: String) -> Node3D:
 		var distance := _surface_distance(node)
 		if distance > best_distance:
 			continue
-		if forward.dot(relative.normalized()) < MELEE_FACING_DOT:
+		if forward.dot(relative.normalized()) < MELEE_FACING_DOT or not _mine_path_clear(node):
 			continue
 		best = node
 		best_distance = distance
@@ -664,6 +686,8 @@ func _collect_resource() -> void:
 		if ui != null:
 			ui.toast("Envanter dolu", "", Color(0.95, 0.42, 0.36))
 		return
+	if kind == "iron" and target.get_meta("harvest_source", "") == MINE.IRON_SOURCE:
+		mine_iron_collected = true
 	if leftover > 0:
 		target.set_meta("wood_amount", leftover)
 		target.set_meta("amount", leftover)
@@ -1564,6 +1588,53 @@ func _advance_jump(delta: float) -> void:
 				if animator != null and animator.current_animation == jump_clip:
 					animator.seek(maxf(animator.current_animation_position, JUMP_CLIP_LANDING), true)
 
+func _has_mining_tool() -> bool:
+	return inventory.count("copper_pickaxe") > 0 or inventory.count("iron_pickaxe") > 0
+
+func _update_expedition() -> void:
+	if not survived_first_night or is_dead:
+		return
+	var old_stage := expedition_stage
+	match expedition_stage:
+		Expedition.FIND:
+			if player.global_position.distance_to(MINE.ENTRANCE) < 10:
+				expedition_stage = Expedition.RETURN
+				ui.toast("Terk edilmiş madeni keşfettin.")
+		Expedition.RETURN:
+			if player.global_position.distance_to(CAMP_POSITION) < 8 and (copper >= 5 or _has_mining_tool()):
+				expedition_stage = Expedition.MINE_IRON
+		Expedition.MINE_IRON:
+			if mine_iron_collected:
+				expedition_stage = Expedition.COMPLETE
+				ui.toast("Maden seferi tamamlandı.")
+	if old_stage != expedition_stage:
+		_schedule_checkpoint()
+
+func _expedition_hint() -> String:
+	match expedition_stage:
+		Expedition.FIND:
+			return "Kuzeydeki maden kulesine ulaş · %d m" % ceili(player.position.distance_to(MINE.ENTRANCE))
+		Expedition.RETURN:
+			if copper < 5 and not _has_mining_tool():
+				return "Girişten bakır topla · %d/5" % copper
+			return "Bakırı kampa götür · %d m" % ceili(player.position.distance_to(CAMP_POSITION))
+		Expedition.MINE_IRON:
+			if not _has_mining_tool():
+				return "Tab ile bakır kazma üret · 5 bakır, 3 odun, 1 ip"
+			return "Galerideki demiri çıkar · Meşaleyle yolu bul."
+	return ""
+
+func _update_gallery_camera() -> void:
+	var camera: Camera3D = camera_pivot.get_node("Camera")
+	var desired := Vector3(0, 1, camera_distance)
+	if camera_pivot.global_position.distance_squared_to(MINE.ENTRANCE) < 45 * 45:
+		var ray := PhysicsRayQueryParameters3D.create(camera_pivot.global_position, camera_pivot.to_global(desired), 4)
+		var hit := get_world_3d().direct_space_state.intersect_ray(ray)
+		if not hit.is_empty():
+			var reach := maxf(0.15, camera_pivot.global_position.distance_to(hit.position) - 0.22)
+			desired = desired.normalized() * reach
+	camera.position = desired
+
 func _closest_fire(radius: float, lit_only := false) -> Node3D:
 	var closest: Node3D
 	for fire in campfires:
@@ -1696,6 +1767,7 @@ func _physics_process(delta: float) -> void:
 	else:
 		player.global_position = Vector3(clampf(pos.x, -WORLD_LIMIT, WORLD_LIMIT), pos.y, clampf(pos.z, -WORLD_LIMIT, WORLD_LIMIT))
 	_advance_survival(delta)
+	_update_expedition()
 	_update_health(delta)
 	if direction.length_squared() > 0.01:
 		visuals.rotation.y = lerp_angle(visuals.rotation.y, atan2(direction.x, direction.z) + deg_to_rad(character_facing_offset), delta * 10.0)
@@ -1703,6 +1775,7 @@ func _physics_process(delta: float) -> void:
 	_advance_axe_impact(delta)
 	_update_placement()
 	camera_pivot.global_position = camera_pivot.global_position.lerp(player.global_position + Vector3(0, 1.5, 0), minf(delta * 8.0, 1.0))
+	_update_gallery_camera()
 	_update_hud()
 	if session_active:
 		save_elapsed += delta

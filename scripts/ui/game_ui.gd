@@ -128,6 +128,8 @@ func _build() -> void:
 	_warmth = _label("", 16, TEXT)
 	status_box.add_child(_warmth)
 	_night_goal = _label("", 16, ACCENT)
+	_night_goal.custom_minimum_size.x = 300
+	_night_goal.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_box.add_child(_night_goal)
 
 	# Saat (sag ust)
