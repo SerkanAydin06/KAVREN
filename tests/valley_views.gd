@@ -21,9 +21,9 @@ func _capture() -> void:
 	DirAccess.make_dir_recursive_absolute(folder)
 	var views := [
 		["companions-valley",Vector3(-5,5,12),Vector3(0,1.1,-8)],
-		["filizik",Vector3(-2,2.3,0.3),Vector3(-3,0.9,-3)],
-		["damlup",Vector3(11,4,-8),Vector3(9,2,-13)],
-		["cakilcik",Vector3(-5,5,-18),Vector3(-8,3.2,-22)],
+		["starter-thicket",Vector3(-2,2.3,0.3),Vector3(-3,0.9,-3)],
+		["reed-pool",Vector3(11,4,-8),Vector3(9,2,-13)],
+		["rocky-verge",Vector3(-5,5,-18),Vector3(-8,3.2,-22)],
 		["passage",Vector3(0,7,-25),Vector3(0,1,-39)],
 	]
 	for view in views:

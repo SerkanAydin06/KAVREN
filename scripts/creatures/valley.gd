@@ -1,6 +1,7 @@
 extends "res://scripts/main.gd"
 
 const COMPANION := preload("res://scripts/creatures/companion.gd")
+const MEADOW := preload("res://scripts/creatures/meadow.gd")
 const STATE_PATH := "user://ashvale-companions-v1.json"
 const RADIUS := 60.0
 var creatures: Array[Node3D] = []
@@ -11,6 +12,10 @@ var experience := [0,0,0]
 var active_species := 0
 var gate_open := false
 var discovered := false
+var habitat := -1
+var wild_actor: Node3D
+var wild_level := 1
+var special_ready_turn := 1
 var battle := -1
 var resolving := false
 var battle_camera: Camera3D
@@ -26,7 +31,7 @@ var turn_count := 0
 var journal: Label
 var prompt: Label
 var panel: Label
-var note := "Filizik yapraklı kulaklarını sana çevirdi. Yaklaş ve E ile tanış."
+var note := "Patikanın solundaki otlukta yapraklar kıpırdıyor."
 var bushes: Array[Node3D] = []
 var gate: StaticBody3D
 var gate_visual: Node3D
@@ -50,10 +55,7 @@ func _ready() -> void:
 	print("AshvaleCompanions ready: 3 species, rolling valley, friendship and exploration")
 
 static func height_at(x: float, z: float) -> float:
-	var ridge := 2.7*exp(-pow((z+21.0)/11.0,2.0))
-	var side := 1.4*sin(x*0.075)*sin(z*0.055)
-	var clearing := smoothstep(7.0,17.0,Vector2(x,z).length())
-	return (ridge+side)*clearing
+	return MEADOW.height(x,z)
 
 # The same world coordinate gets the same normal on both sides of a grid edge.
 static func _ground_normal(point: Vector2, spacing: float) -> Vector3:
@@ -99,11 +101,14 @@ func _make_valley() -> void:
 	var collider := CollisionShape3D.new()
 	collider.shape = mesh.create_trimesh_shape()
 	ground.add_child(collider)
-	for i in range(26):
-		var angle := i*TAU/26
-		var pos := Vector3(cos(angle)*(17+i%4*5),0,sin(angle)*(26+i%3*4))
+	MEADOW.populate(self)
+	for i in range(60):
+		var angle := i*2.39996
+		var pos := Vector3(cos(angle)*(18+i%6*5),0,sin(angle)*(20+i%6*4))
 		if pos.z < -22 and absf(pos.x)<10:
 			pos.x += 13
+		if MEADOW.POOLS.any(func(pool): return MEADOW.pool_distance(Vector2(pos.x,pos.z),pool)<1.25):
+			continue
 		pos.y = height_at(pos.x,pos.z)
 		var tree := STYLIZED_PREVIEW_SCENE.tree_visual(i%3==0)
 		tree.position = pos
@@ -132,7 +137,6 @@ func _make_valley() -> void:
 		var x := sin(i*2.399)*float(3+i%9)
 		var z := -43.0+cos(i*2.399)*float(2+i%4)
 		_prop_blob(Vector3(x,height_at(x,z)+0.22,z),Vector3(0.19,0.22,0.19),[Color("#ffd275"),Color("#efadb5"),Color("#c3b2f0")][i%3])
-	_prop_blob(Vector3(10,height_at(10,-13)+0.03,-13),Vector3(3.3,0.08,2.5),Color("#78ced9"))
 	for i in range(5):
 		var pos := Vector3(-9+i%3,0,-22+i%2)
 		pos.y = height_at(pos.x,pos.z)+0.3
@@ -216,8 +220,9 @@ func _make_companions() -> void:
 	for i in range(3):
 		var creature := COMPANION.new()
 		creature.species = i
-		var locations := [Vector3(-3,0,-3),Vector3(9,0,-13),Vector3(-8,0,-22)]
-		creature.position = locations[i]
+		var home: Vector2 = MEADOW.HABITATS[i]
+		creature.position = Vector3(home.x,0,home.y)
+		creature.hide()
 		creature.position.y = height_at(creature.position.x,creature.position.z)
 		add_child(creature)
 		creatures.append(creature)
@@ -286,39 +291,51 @@ func _strength_meter(row: HBoxContainer, tint: Color) -> ProgressBar:
 	row.add_child(meter)
 	return meter
 
-func _nearest_creature() -> int:
-	var nearest := -1
-	var distance := 3.0
-	for i in range(creatures.size()):
-		if creatures[i].bonded:
-			continue
-		var gap := player.position.distance_to(creatures[i].position)
-		if gap < distance:
-			distance = gap
-			nearest = i
-	return nearest
+func _habitat_at_player() -> int:
+	var foot := Vector2(player.position.x,player.position.z)
+	for i in range(MEADOW.HABITATS.size()):
+		if foot.distance_to(MEADOW.HABITATS[i]) < MEADOW.RADII[i]:
+			return i
+	return -1
+
+func _check_habitat() -> void:
+	if battle >= 0:
+		return
+	var entered := _habitat_at_player()
+	if entered == habitat:
+		return
+	habitat = entered
+	creatures[0].hide()
+	if entered < 0:
+		return
+	if roster.is_empty():
+		if entered == 0:
+			creatures[0].show()
+			note = "Otluktan bir Filizik çıktı. E ile meyve sun."
+		else:
+			note = "Sazlar kıpırdıyor. Önce başlangıç otluğundan bir yoldaş edin."
+	elif creatures[entered].tired and not roster.has(entered):
+		note = "Burada yenilmiş bir yaratık var. E ile ekibine al."
+	else:
+		_begin_training(entered)
 
 func _interact() -> void:
-	var near := _nearest_creature()
-	if near >= 0:
-		var creature: Node3D = creatures[near]
-		if near == 0 and not roster.has(0):
-			if berries == 0:
-				note = "Filizik bir meyve bekliyor. Yeşil çalılardan E ile topla."
-				return
+	_check_habitat()
+	if battle >= 0:
+		return
+	if habitat == 0 and roster.is_empty():
+		if berries > 0:
 			berries -= 1
-			creature.trust += 1
-			if creature.trust >= 2:
-				_bond(near)
-			else:
-				note = "Filizik yaklaşmana izin verdi. Bir meyve daha sun."
-		elif creature.tired:
-			_bond(near)
-		elif roster.is_empty():
-			note = "Önce Filizik ile arkadaş ol."
+			creatures[0].trust += 1
+			note = "Filizik yaklaştı. Bir meyve daha sun."
+			if creatures[0].trust >= 2:
+				_bond(0)
+			_checkpoint_creatures()
 		else:
-			_begin_training(near)
-		_checkpoint_creatures()
+			note = "Meyve bulmak için çalılara yaklaş."
+		return
+	if habitat >= 0 and creatures[habitat].tired and not roster.has(habitat):
+		_bond(habitat)
 		return
 	for shrub in bushes:
 		if player.position.distance_to(shrub.position) < 2.5:
@@ -332,13 +349,21 @@ func _interact() -> void:
 	note = "Kulaklı dostlara yaklaş · E tanış · Tab yoldaş değiştir"
 
 func _begin_training(index: int) -> void:
-	if index == active_species or roster.is_empty():
+	if index < 0 or index >= creatures.size() or roster.is_empty():
 		return
 	if battle >= 0:
 		return
 	battle = index
 	var ally: Node3D = creatures[active_species]
-	var rival: Node3D = creatures[index]
+	wild_actor = COMPANION.new()
+	wild_actor.species = index
+	var center: Vector2 = MEADOW.HABITATS[index]
+	var arena := center + Vector2(-1.5,1.0)
+	wild_actor.position = Vector3(arena.x,height_at(arena.x,arena.y),arena.y)
+	add_child(wild_actor)
+	var rival := wild_actor
+	wild_level = clampi(int(levels[active_species])-1,1,99)
+	special_ready_turn = 1
 	ally_origin = ally.position
 	ally.position = rival.position + Vector3(-3.2,0,1.2)
 	ally.position.y = height_at(ally.position.x,ally.position.z)
@@ -357,27 +382,10 @@ func _begin_training(index: int) -> void:
 	battle_camera.fov = 49
 	battle_camera.current = true
 	visuals.hide()
-	friend_energy = 30+levels[active_species]*5
-	rival_energy = 24+index*4
+	friend_energy = COMPANION.max_hp(active_species,levels[active_species])
+	rival_energy = COMPANION.max_hp(index,wild_level)
 	turn_count = 0
 	note = "Rakip mevzi aldı. Hamleni seç."
-
-func _spar_again() -> void:
-	if roster.is_empty() or battle >= 0:
-		return
-	var target := -1
-	var distance := 4.0
-	for i in range(3):
-		if i == active_species:
-			continue
-		var gap := player.position.distance_to(creatures[i].position)
-		if gap < distance:
-			distance = gap
-			target = i
-	if target >= 0:
-		_begin_training(target)
-	else:
-		note = "Karşılaşma için başka bir türe yaklaş."
 
 func _bond(index: int) -> void:
 	if roster.has(index):
@@ -393,11 +401,13 @@ func _finish_encounter() -> void:
 	if battle < 0:
 		return
 	var ally: Node3D = creatures[active_species]
-	for actor in [ally,creatures[battle]]:
+	for actor in [ally,wild_actor]:
 		actor.engaged = false
-		actor.visible = not actor.bonded
+		actor.hide()
 		actor.label.show()
 	ally.position = ally_origin
+	wild_actor.queue_free()
+	wild_actor = null
 	battle = -1
 	resolving = false
 	visuals.show()
@@ -405,10 +415,13 @@ func _finish_encounter() -> void:
 	battle_camera.queue_free()
 	combat_card.hide()
 
-func _strike(actor: Node3D, defender: Node3D) -> void:
+func _strike(actor: Node3D, defender: Node3D, special := false) -> void:
 	var start := actor.position
 	var travel := defender.position - start
 	travel.y = 0.0
+	if actor.species == 1 or special:
+		await _cast_element(actor,defender,special)
+		return
 	var motion := actor.create_tween()
 	motion.tween_property(actor,"position",start-travel.normalized()*0.24,0.13)
 	var contact := start+travel.normalized()*maxf(0.1,travel.length()-0.95)
@@ -418,6 +431,39 @@ func _strike(actor: Node3D, defender: Node3D) -> void:
 	motion.tween_callback(_impact.bind(actor,defender))
 	motion.tween_property(actor,"position",start,0.23)
 	await motion.finished
+
+func _cast_element(actor: Node3D, defender: Node3D, special: bool) -> void:
+	var target := defender.position + Vector3.UP*0.6
+	var origin := actor.position + Vector3.UP*0.8
+	var effect := MeshInstance3D.new()
+	var shape := SphereMesh.new()
+	shape.radial_segments = 8
+	shape.rings = 3
+	effect.mesh = shape
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = COMPANION.SPECIES[actor.species].accent
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	effect.material_override = mat
+	effect.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(effect)
+	match actor.species:
+		0: # A root erupts at the opponent's feet.
+			origin = target - Vector3.UP*0.85
+			effect.scale = Vector3(0.26,1.1,0.26)
+		1: # A pressure bolt travels along the glider's line of sight.
+			effect.scale = Vector3(0.32,0.32,1.12) if special else Vector3(0.22,0.22,0.65)
+		2: # A stone drops vertically over the defender.
+			origin = target + Vector3.UP*2.1
+			effect.scale = Vector3(0.78,0.65,0.72)
+	effect.position = origin
+	if actor.species == 1:
+		effect.look_at(target)
+	var cast := effect.create_tween()
+	cast.tween_property(effect,"position",target,0.32).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	cast.tween_callback(_impact.bind(actor,defender))
+	cast.tween_property(effect,"scale",Vector3.ONE*0.02,0.14)
+	await cast.finished
+	effect.queue_free()
 
 func _impact(actor: Node3D, defender: Node3D) -> void:
 	var center := defender.position + Vector3.UP*0.65
@@ -456,22 +502,26 @@ func _impact(actor: Node3D, defender: Node3D) -> void:
 	recoil.tween_property(defender.visual,"rotation:y",initial+0.24,0.06)
 	recoil.tween_property(defender.visual,"rotation:y",initial,0.15)
 
-func _battle_action(guard: bool) -> void:
+func _battle_action(guard: bool, special := false) -> void:
 	if battle < 0 or resolving:
+		return
+	if special and (levels[active_species] < COMPANION.SPECIAL_LEVEL or turn_count + 1 < special_ready_turn):
 		return
 	resolving = true
 	var target := battle
 	var ally: Node3D = creatures[active_species]
-	var rival: Node3D = creatures[target]
+	var rival := wild_actor
 	turn_count += 1
 	var heavy := turn_count % 3 == 0
 	if guard:
-		friend_energy = mini(30+levels[active_species]*5,friend_energy+3)
+		friend_energy = mini(COMPANION.max_hp(active_species,levels[active_species]),friend_energy+3)
 		note = "Savunma alındı."
 	else:
-		note = COMPANION.SPECIES[active_species].move
-		await _strike(ally,rival)
-		rival_energy -= int(COMPANION.SPECIES[active_species].power)+levels[active_species]*2
+		note = COMPANION.SPECIAL[active_species] if special else COMPANION.SPECIES[active_species].move
+		if special:
+			special_ready_turn = turn_count + 3
+		await _strike(ally,rival,special)
+		rival_energy -= COMPANION.damage(active_species,levels[active_species],target,special)
 	if rival_energy <= 0:
 		creatures[target].tired = true
 		experience[active_species] += 12
@@ -481,15 +531,15 @@ func _battle_action(guard: bool) -> void:
 		while levels[active_species]<99 and experience[active_species] >= levels[active_species]*10:
 			experience[active_species] -= levels[active_species]*10
 			levels[active_species] += 1
-		note = "Karşılaşma kazanıldı. "+COMPANION.SPECIES[active_species].name+" seviye "+str(levels[active_species])+". E ile yeni dostuna yaklaş."
+		note = "Karşılaşma kazanıldı. "+COMPANION.SPECIES[active_species].name+" seviye "+str(levels[active_species])+(". E ile ekibine al." if not roster.has(target) else ".")
 		_finish_encounter()
 		_checkpoint_creatures()
 		return
 	note = "Rakip ağır vuruşa geçti." if heavy else "Rakip karşılık veriyor."
-	await _strike(rival,ally)
-	var incoming := 7+target
+	await _strike(rival,ally,heavy and wild_level >= COMPANION.SPECIAL_LEVEL)
+	var incoming := COMPANION.damage(target,wild_level,active_species,heavy and wild_level >= COMPANION.SPECIAL_LEVEL)
 	if heavy:
-		incoming *= 2
+		incoming = roundi(incoming*1.4)
 	friend_energy -= 1 if guard else incoming
 	if heavy and guard:
 		rival_energy = maxi(1,rival_energy-5)
@@ -529,8 +579,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_E:
 				if battle < 0:
 					_interact()
-			KEY_R:
-				_spar_again()
+			KEY_3:
+				_battle_action(false,true)
 			KEY_F:
 				if battle < 0:
 					_open_path()
@@ -585,11 +635,7 @@ func _physics_process(delta: float) -> void:
 	camera.position = Vector3(0,1,camera_distance)
 	if not hit.is_empty():
 		camera.position = camera.position.normalized()*maxf(0.2,camera_pivot.position.distance_to(hit.position)-0.2)
-	for creature in creatures:
-		if creature.engaged or creature.bonded:
-			continue
-		creature.patrol(delta,player.position)
-		creature.position.y = height_at(creature.position.x,creature.position.z)
+	_check_habitat()
 	if gate_open and player.position.z < -38 and not discovered:
 		discovered = true
 		note = "Çiçekli açıklık keşfedildi. İlk yolculuğun tamamlandı!"
@@ -602,7 +648,7 @@ func _physics_process(delta: float) -> void:
 
 func _refresh_interface() -> void:
 	field_card.visible = battle < 0
-	var goal := "Filizik ile dost ol · E ile meyve sun"
+	var goal := "Solundaki otluğu araştır · Filizik’e meyve sun"
 	if roster.has(0):
 		goal = "Filizik ile bir saha karşılaşması kazan" if levels[0]<2 else "Sarmaşık kapıya git · F ile Filizik'e yardım et"
 	if discovered:
@@ -611,19 +657,25 @@ func _refresh_interface() -> void:
 	var team := "Ekibin henüz boş"
 	if not roster.is_empty():
 		team = "Yoldaş · "+COMPANION.SPECIES[active_species].name+"  Sv."+str(levels[active_species])+"  Deneyim "+str(experience[active_species])+"/"+str(levels[active_species]*10)
-	panel.text = team+"\nMeyve "+str(berries)+"  ·  FPS "+str(Engine.get_frames_per_second())+"\nWASD hareket · Shift koş · Space zıpla · Tab yoldaş · E tanış · R karşılaşma · F yardım\n"+note
+	panel.text = team+"\nMeyve "+str(berries)+"  ·  FPS "+str(Engine.get_frames_per_second())+"\nWASD hareket · Shift koş · Space zıpla · Tab yoldaş · E etkileşim · F sarmaşık\n"+note
 	if battle >= 0:
 		prompt.text = ""
 		combat_card.show()
-		ally_meter.max_value = 30+levels[active_species]*5
+		ally_meter.max_value = COMPANION.max_hp(active_species,levels[active_species])
 		ally_meter.value = friend_energy
-		foe_meter.max_value = 24+battle*4
+		foe_meter.max_value = COMPANION.max_hp(battle,wild_level)
 		foe_meter.value = maxi(0,rival_energy)
 		var shown_turn := turn_count if resolving else turn_count+1
 		var threat := "AĞIR VURUŞ" if shown_turn%3 == 0 else "Saldırı"
-		combat_text.text = "%s  %d   /   %s  %d\nRakibin niyeti · %s\n[1] %s     [2] Savun     [Esc] Çekil" % [COMPANION.SPECIES[active_species].name,friend_energy,COMPANION.SPECIES[battle].name,maxi(0,rival_energy),threat,COMPANION.SPECIES[active_species].move]
+		var info: Dictionary = COMPANION.SPECIES[active_species]
+		var foe: Dictionary = COMPANION.SPECIES[battle]
+		var factor := COMPANION.potency(active_species,battle)
+		var foe_move: String = COMPANION.SPECIAL[battle] if shown_turn%3 == 0 and wild_level >= COMPANION.SPECIAL_LEVEL else foe.move
+		var special_hint := "Sv.2'de açılır" if levels[active_species] < COMPANION.SPECIAL_LEVEL else ("hazır" if shown_turn >= special_ready_turn else "bekle")
+		combat_text.text = "%s · %s Sv.%d  %d can    /    %s · %s Sv.%d  %d can\n%s ×%.1f   ·   Rakip: %s (%s)\n[1] %s    [2] Savun    [3] %s (%s)    [Esc] Çekil" % [info.name,COMPANION.ELEMENT[active_species],levels[active_species],maxi(0,friend_energy),foe.name,COMPANION.ELEMENT[battle],wild_level,maxi(0,rival_energy),COMPANION.ELEMENT[active_species],factor,foe_move,threat,info.move,COMPANION.SPECIAL[active_species],special_hint]
+
 	else:
-		prompt.text = "[E] "+COMPANION.SPECIES[_nearest_creature()].name+" ile tanış" if _nearest_creature()>=0 else ""
+		prompt.text = ""
 
 func _checkpoint_creatures() -> void:
 	if not progress_writable or get_tree().current_scene != self:

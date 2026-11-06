@@ -5,6 +5,23 @@ const SPECIES := [
 	{"name": "Damlup", "color": Color("#6ec9df"), "accent": Color("#c4eff6"), "move": "Basınç Dalgası", "power": 6},
 	{"name": "Çakılcık", "color": Color("#c99385"), "accent": Color("#f4d394"), "move": "Fay Darbesi", "power": 8},
 ]
+const ELEMENT := ["Doğa", "Su", "Taş"]
+const SPECIAL := ["Kök Kapanı", "Akıntı Mızrağı", "Kaya Çöküşü"]
+const BASE_HP := [28, 26, 32]
+const SPECIAL_LEVEL := 2
+
+static func max_hp(index: int, level: int) -> int:
+	return BASE_HP[index] + level * 5
+
+static func potency(attacker: int, defender: int) -> float:
+	if attacker == defender:
+		return 1.0
+	return 1.5 if (attacker + 1) % ELEMENT.size() == defender else 0.7
+
+static func damage(attacker: int, level: int, defender: int, special: bool) -> int:
+	var power := int(SPECIES[attacker].power) + level * 2 + (5 if special else 0)
+	return maxi(1,roundi(power * potency(attacker,defender)))
+
 var species := 0
 var bonded := false
 var tired := false
@@ -186,6 +203,8 @@ func patrol(delta: float, observer: Vector3) -> void:
 		rotation.y = lerp_angle(rotation.y,atan2(direction.x,direction.z),minf(delta*5,1))
 
 func _process(delta: float) -> void:
+	if not visible:
+		return
 	phase += delta
 	var stride := sin(phase*(8.5-species))
 	var lift := 0.03

@@ -4,9 +4,11 @@ Kodla oluşturulan çizgi film dünyasında yaratıklarla dostluk kurma, gelişm
 
 ## İlk yolculuk
 
-Filizik'in yanına gel ve E ile iki meyve sun. Meyveleri başlangıçtaki yeşil çalılardan E ile toplayabilirsin. Yoldaşınla Damlup veya Çakılcık'a yaklaş ve E ile saha karşılaşması başlat. 1 yetenek, 2 savunma, Esc ayrılma. Savaşta rakibin sıradaki ağır vuruşu önceden görünür. Savunma bu darbeyi karşılar. Yakalanan yaratıklar yalnızca savaşta sahaya çağrılır. Dinlenen yaratığa E ile yaklaşarak onu da ekibine alabilirsin.
+Patikanın solundaki sık otluğa gir ve ortaya çıkan Filizik’e E ile iki meyve sun. Çalılardan E ile meyve toplayabilirsin. Yoldaşını edindikten sonra gölet kıyısındaki sazlıkta Damlup, kayalık yamaçta Çakılcık, başlangıç otluğunda ise yabani Filizik ile karşılaşırsın. Aynı yerde tekrar savaşmak için alandan çıkıp yeniden gir.
 
-Seviye 2 Filizik ile vadinin sarmaşık geçidine gel. F ile geçidi aç ve yeni çiçekli açıklığa ulaş. Tab aktif yoldaşı değiştirir. R yakındaki başka bir yaratıkla yeniden karşılaşma başlatır. Kazanılan seviye, dostluk, ekip ve keşif ilerlemesi ayrı bir otomatik kayıt dosyasına yazılır.
+Savaşta 1 temel saldırı, 2 savunma, 3 özel teknik, Esc çekilme. Doğa suya, su taşa, taş doğaya üstün gelir. Üstün saldırı 1,5×, ters eşleşme 0,7× hasar verir. Kazanılan deneyim seviyeyi, azami canı ve saldırı gücünü artırır. İkinci seviyede türe özgü teknik açılır. Kullanıldıktan sonra iki tur bekler. Yendiğin yeni türü aynı alanda E ile ekibine alabilirsin. Tab aktif yoldaşı değiştirir.
+
+Seviye 2 Filizik ile vadinin sarmaşık geçidinde F’ye basarak çiçekli açıklığı aç. Ekip, deneyim ve keşif ilerlemesi otomatik kaydedilir.
 
 WASD hareket, fare kamera, Shift koşu, Space zıplama. F11 ekran modu.
 
