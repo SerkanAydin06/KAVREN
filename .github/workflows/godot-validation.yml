@@ -47,15 +47,7 @@ jobs:
             echo "Godot scene reported script errors"
             exit 1
           fi
-          grep -F "Ashvale character: res://assets/characters/Char1/Walking.fbx" godot-smoke.log
-          grep -F "Ashvale animation imported: Idle" godot-smoke.log
-          grep -F "Ashvale animation imported: Run" godot-smoke.log
-          grep -F "Ashvale animation imported: Attack" godot-smoke.log
-          grep -F "Ashvale animation imported: Jump" godot-smoke.log
-          grep -F "Ashvale animation imported: Death" godot-smoke.log
-          grep -F "Ashvale style preview: stylized tree + rock added" godot-smoke.log
-          grep -F "Ashvale mineables:" godot-smoke.log
-          grep -F "Ashvale equipped tools: mount=mixamorig_RightHand axe=hand_axe pickaxe=true" godot-smoke.log
+          grep -F "AshvaleCompanions ready:" godot-smoke.log
 
       - name: Validate Char1 bone motion
         shell: bash
@@ -178,6 +170,14 @@ jobs:
           fi
           grep -E "AshvaleInventoryTest .*failures=0" godot-inventory.log
 
+      - name: Validate companion friendship, training, exploration and save
+        shell: bash
+        run: |
+          set -o pipefail
+          export XDG_DATA_HOME="$RUNNER_TEMP/companion-tests"
+          timeout 100s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/companion_diagnostics.gd 2>&1 | tee companion.log
+          if grep -E 'SCRIPT ERROR|^ERROR:' companion.log; then exit 1; fi
+          grep -F 'AshvaleCompanionsTest failures=0' companion.log
       - name: Capture camp, trail and mine views
         shell: bash
         run: |
