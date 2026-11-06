@@ -2,10 +2,10 @@ extends StaticBody3D
 
 const ENTRANCE := Vector3(0, 0, -74)
 const IRON_SOURCE := "MineIron"
-const WOOD := Color("#67513c")
+const WOOD := Color("#a77448")
 const TAR := Color("#42372f")
-const ROCK := Color("#383a42")
-const IRON := Color("#61534b")
+const ROCK := Color("#535a70")
+const IRON := Color("#66778a")
 var materials := {}
 
 func _ready() -> void:
@@ -62,6 +62,28 @@ func _ready() -> void:
 	wheel.rotation.x = PI * 0.5
 	wheel.material_override = _material(IRON)
 	add_child(wheel)
+	_hang_pennants()
+
+func _hang_pennants() -> void:
+	var flags := SurfaceTool.new()
+	flags.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var colors := [Color("#e96e54"), Color("#f4c45d"), Color("#52b4ac")]
+	for i in range(7):
+		var x := -2.6 + i * 0.75
+		var y := 13.9 - 0.45 * sin(PI * i / 6)
+		flags.set_color(colors[i % colors.size()])
+		flags.add_vertex(Vector3(x, y, 1.58))
+		flags.add_vertex(Vector3(x + 0.34, y - 1.03, 1.65))
+		flags.add_vertex(Vector3(x + 0.72, y, 1.58))
+	flags.generate_normals()
+	var banner := MeshInstance3D.new()
+	banner.mesh = flags.commit()
+	var cloth := StandardMaterial3D.new()
+	cloth.vertex_color_use_as_albedo = true
+	cloth.cull_mode = BaseMaterial3D.CULL_DISABLED
+	banner.material_override = cloth
+	banner.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(banner)
 
 func _box(center: Vector3, dimensions: Vector3, tint: Color, solid := true) -> MeshInstance3D:
 	var piece := MeshInstance3D.new()

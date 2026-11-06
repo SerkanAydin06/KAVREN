@@ -19,10 +19,10 @@ const SKY_SHADER := """
 shader_type sky;
 render_mode use_debanding;
 
-uniform vec3 day_top : source_color = vec3(0.20, 0.42, 0.78);
-uniform vec3 day_horizon : source_color = vec3(0.70, 0.82, 0.92);
-uniform vec3 sunset_horizon : source_color = vec3(1.0, 0.52, 0.26);
-uniform vec3 sunset_top : source_color = vec3(0.30, 0.32, 0.55);
+uniform vec3 day_top : source_color = vec3(0.22, 0.57, 0.84);
+uniform vec3 day_horizon : source_color = vec3(0.76, 0.91, 0.92);
+uniform vec3 sunset_horizon : source_color = vec3(1.0, 0.64, 0.39);
+uniform vec3 sunset_top : source_color = vec3(0.49, 0.40, 0.70);
 uniform vec3 night_top : source_color = vec3(0.008, 0.012, 0.035);
 uniform vec3 night_horizon : source_color = vec3(0.03, 0.05, 0.09);
 uniform vec3 ground_tint : source_color = vec3(0.24, 0.21, 0.16);
@@ -83,10 +83,10 @@ void sky() {
 		vec2 uv = dir.xz / (dir.y + 0.18) * 0.22;
 		float n = texture(cloud_noise, uv + cloud_offset).r * 0.65 + texture(cloud_noise, uv * 2.7 - cloud_offset * 1.6).r * 0.35;
 		float threshold = 1.0 - cloud_coverage;
-		float density = smoothstep(threshold, threshold + 0.28, n) * smoothstep(0.0, 0.12, dir.y);
-		float thickness = smoothstep(threshold, threshold + 0.6, n);
+		float density = smoothstep(threshold, threshold + 0.065, n) * smoothstep(0.0, 0.12, dir.y);
+		float thickness = smoothstep(threshold + 0.11, threshold + 0.15, n);
 		vec3 lit = mix(vec3(1.0), vec3(1.0, 0.7, 0.5), sunset_factor);
-		vec3 shade = mix(vec3(0.55, 0.6, 0.7), vec3(0.45, 0.35, 0.4), sunset_factor);
+		vec3 shade = mix(vec3(0.66, 0.76, 0.88), vec3(0.67, 0.43, 0.58), sunset_factor);
 		vec3 cloud_col = mix(lit, shade, thickness) * mix(0.06, 1.0, day_factor);
 		cloud_col += sun_tint * pow(max(sun_dot, 0.0), 8.0) * 0.35 * sun_visible * (1.0 - thickness);
 		col = mix(col, cloud_col, density * 0.92);
