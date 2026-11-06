@@ -1,6 +1,16 @@
 extends SceneTree
 func _initialize() -> void: call_deferred("_capture")
 func _capture() -> void:
+	var menu: Node = load("res://scenes/title_menu.tscn").instantiate()
+	root.add_child(menu)
+	for frame in range(12):
+		await RenderingServer.frame_post_draw
+	var menu_folder := "user://valley-views"
+	DirAccess.make_dir_recursive_absolute(menu_folder)
+	if root.get_texture().get_image().save_png(menu_folder+"/menu.png") != OK:
+		quit(1)
+		return
+	menu.free()
 	var scene: Node = load("res://creature_valley.tscn").instantiate()
 	root.add_child(scene)
 	scene.set_physics_process(false)

@@ -47,7 +47,7 @@ jobs:
             echo "Godot scene reported script errors"
             exit 1
           fi
-          grep -F "AshvaleCompanions ready:" godot-smoke.log
+          grep -F "Filizya menu ready" godot-smoke.log
 
       - name: Validate Char1 bone motion
         shell: bash
@@ -178,6 +178,14 @@ jobs:
           timeout 100s ./Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/companion_diagnostics.gd 2>&1 | tee companion.log
           if grep -E 'SCRIPT ERROR|^ERROR:' companion.log; then exit 1; fi
           grep -F 'AshvaleCompanionsTest failures=0' companion.log
+      - name: Verify new game, cancel and continue from the title
+        shell: bash
+        run: |
+          set -o pipefail
+          export XDG_DATA_HOME="$RUNNER_TEMP/filizya-menu-test"
+          timeout 90s ./Godot_v4.7.2-stable_linux.x86_64 --headless --script tests/menu_diagnostics.gd 2>&1 | tee menu.log
+          if grep -E 'SCRIPT ERROR|^ERROR:' menu.log; then exit 1; fi
+          grep -F 'FilizyaMenuTest failures=0' menu.log
       - name: Capture camp, trail and mine views
         shell: bash
         run: |

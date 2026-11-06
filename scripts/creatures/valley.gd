@@ -40,7 +40,11 @@ func _ready() -> void:
 	player.position = Vector3(0,0.2,4)
 	_make_companions()
 	_make_interface()
-	_load_progress()
+	if get_tree().has_meta("filizya_new_game"):
+		get_tree().remove_meta("filizya_new_game")
+		call_deferred("_checkpoint_creatures")
+	else:
+		_load_progress()
 	_refresh_interface()
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	print("AshvaleCompanions ready: 3 species, rolling valley, friendship and exploration")
@@ -509,8 +513,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_ESCAPE:
 				if resolving:
 					return
-				_finish_encounter()
-				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+				if battle >= 0:
+					_finish_encounter()
+				else:
+					_checkpoint_creatures()
+					get_tree().change_scene_to_file("res://scenes/title_menu.tscn")
 			KEY_E:
 				if battle < 0:
 					_interact()
@@ -628,11 +635,14 @@ func _checkpoint_creatures() -> void:
 static func _number(value: Variant) -> bool:
 	return (value is int or value is float) and is_finite(float(value))
 
+func _previous_save_path() -> String:
+	var previous_folder := OS.get_user_data_dir().get_base_dir().path_join("Ashvale - Survival RPG Prototype")
+	return previous_folder.path_join("ashvale-companions-v1.json")
+
 func _load_progress() -> void:
 	# Application names select a new user directory. Copy the existing adventure once.
 	if not FileAccess.file_exists(STATE_PATH):
-		var previous_folder := OS.get_user_data_dir().get_base_dir().path_join("Ashvale - Survival RPG Prototype")
-		var previous_save := previous_folder.path_join("ashvale-companions-v1.json")
+		var previous_save := _previous_save_path()
 		if FileAccess.file_exists(previous_save):
 			var migrated := DirAccess.copy_absolute(previous_save, ProjectSettings.globalize_path(STATE_PATH))
 			if migrated != OK:
