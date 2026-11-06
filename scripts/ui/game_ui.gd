@@ -25,6 +25,14 @@ var _health_text: Label
 var _stamina_fill: ColorRect
 var _warmth: Label
 var _night_goal: Label
+var _fps_label: Label
+var _frame_label: Label
+var _previous_frame_us := 0
+var _sample_us := 0
+var _sample_frames := 0
+var _peak_us := 0
+var _previous_peak_us := 0
+var _peak_window_us := 0
 var _clock: Label
 var _clock_sub: Label
 var _hotbar_slots: Array = []
@@ -149,6 +157,21 @@ func _build() -> void:
 	_clock_sub = _label("GÜNDÜZ", 14, MUTED)
 	_clock_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	clock_box.add_child(_clock_sub)
+
+	# Keep performance readings visible directly below the clock.
+	var performance_panel := PanelContainer.new()
+	performance_panel.name = "PerformancePanel"
+	_place(performance_panel, Vector2(1, 0), Rect2(-264, 138, 232, 0))
+	performance_panel.add_theme_stylebox_override("panel", _panel_style(0.72))
+	performance_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(performance_panel)
+	var readings := VBoxContainer.new()
+	readings.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	performance_panel.add_child(readings)
+	_fps_label = _label("FPS  …", 24, ACCENT)
+	_frame_label = _label("Kare ölçülüyor…", 16, TEXT)
+	readings.add_child(_fps_label)
+	readings.add_child(_frame_label)
 
 	# Hotbar (alt orta)
 	var hotbar := HBoxContainer.new()
@@ -386,7 +409,31 @@ func _build_help() -> void:
 	_help.add_child(text)
 
 # ---------- guncelleme ----------
+func _update_performance() -> void:
+	var now := Time.get_ticks_usec()
+	if _previous_frame_us == 0:
+		_previous_frame_us = now
+		return
+	var elapsed := now - _previous_frame_us
+	_previous_frame_us = now
+	_sample_frames += 1
+	_sample_us += elapsed
+	_peak_us = maxi(_peak_us, elapsed)
+	_peak_window_us += elapsed
+	if _sample_us < 500000:
+		return
+	var mean_ms := _sample_us / (1000.0 * _sample_frames)
+	_fps_label.text = "FPS  %d" % roundi(1000.0 / mean_ms)
+	_frame_label.text = "Kare  %.1f ms\nSon tepe  %.1f ms" % [mean_ms, maxi(_peak_us, _previous_peak_us) / 1000.0]
+	_sample_frames = 0
+	_sample_us = 0
+	if _peak_window_us >= 2000000:
+		_previous_peak_us = _peak_us
+		_peak_us = 0
+		_peak_window_us = 0
+
 func _process(delta: float) -> void:
+	_update_performance()
 	if _tooltip.visible:
 		_tooltip.position = _root.get_local_mouse_position() + Vector2(22, 22)
 	if _crafting_time >= 0.0:
