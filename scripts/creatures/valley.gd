@@ -12,6 +12,14 @@ var active_species := 0
 var gate_open := false
 var discovered := false
 var battle := -1
+var resolving := false
+var battle_camera: Camera3D
+var ally_origin := Vector3.ZERO
+var combat_card: PanelContainer
+var combat_text: Label
+var field_card: PanelContainer
+var ally_meter: ProgressBar
+var foe_meter: ProgressBar
 var friend_energy := 30
 var rival_energy := 24
 var turn_count := 0
@@ -206,6 +214,7 @@ func _make_interface() -> void:
 	var canvas := CanvasLayer.new()
 	add_child(canvas)
 	var frame := PanelContainer.new()
+	field_card = frame
 	frame.position = Vector2(24,22)
 	frame.custom_minimum_size.x = 610
 	var style := StyleBoxFlat.new()
@@ -226,12 +235,44 @@ func _make_interface() -> void:
 	panel.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	panel.add_theme_font_size_override("font_size",18)
 	stack.add_child(panel)
+	combat_card = PanelContainer.new()
+	combat_card.anchor_left = 0.05
+	combat_card.anchor_right = 0.95
+	combat_card.anchor_top = 1.0
+	combat_card.anchor_bottom = 1.0
+	combat_card.offset_top = -200
+	combat_card.offset_bottom = -26
+	combat_card.add_theme_stylebox_override("panel",style)
+	canvas.add_child(combat_card)
+	combat_text = Label.new()
+	combat_text.add_theme_font_size_override("font_size",22)
+	combat_text.add_theme_color_override("font_color",Color("#ffdfac"))
+	var battle_stack := VBoxContainer.new()
+	combat_card.add_child(battle_stack)
+	var meters := HBoxContainer.new()
+	meters.add_theme_constant_override("separation",30)
+	battle_stack.add_child(meters)
+	ally_meter = _strength_meter(meters,Color("#6ebaa7"))
+	foe_meter = _strength_meter(meters,Color("#d78a69"))
+	battle_stack.add_child(combat_text)
+	combat_card.hide()
 	prompt = Label.new()
 	prompt.position = Vector2(28,740)
 	prompt.add_theme_font_size_override("font_size",23)
 	prompt.add_theme_color_override("font_outline_color",Color("#183b46"))
 	prompt.add_theme_constant_override("outline_size",6)
 	canvas.add_child(prompt)
+
+func _strength_meter(row: HBoxContainer, tint: Color) -> ProgressBar:
+	var meter := ProgressBar.new()
+	meter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meter.custom_minimum_size.y = 9
+	meter.show_percentage = false
+	var fill := StyleBoxFlat.new()
+	fill.bg_color = tint
+	meter.add_theme_stylebox_override("fill",fill)
+	row.add_child(meter)
+	return meter
 
 func _nearest_creature() -> int:
 	var nearest := -1
@@ -281,11 +322,33 @@ func _interact() -> void:
 func _begin_training(index: int) -> void:
 	if index == active_species or roster.is_empty():
 		return
+	if battle >= 0:
+		return
 	battle = index
+	var ally: Node3D = creatures[active_species]
+	var rival: Node3D = creatures[index]
+	ally_origin = ally.position
+	ally.position = rival.position + Vector3(-3.2,0,1.2)
+	ally.position.y = height_at(ally.position.x,ally.position.z)
+	for actor in [ally,rival]:
+		actor.engaged = true
+		actor.walking = false
+		actor.show()
+		actor.label.hide()
+	ally.look_at(Vector3(rival.position.x,ally.position.y,rival.position.z),Vector3.UP,true)
+	rival.look_at(Vector3(ally.position.x,rival.position.y,ally.position.z),Vector3.UP,true)
+	battle_camera = Camera3D.new()
+	add_child(battle_camera)
+	var middle := (ally.position+rival.position)*0.5
+	battle_camera.position = middle + Vector3(1.3,2.1,5.0)
+	battle_camera.look_at(middle + Vector3.UP*0.75)
+	battle_camera.fov = 49
+	battle_camera.current = true
+	visuals.hide()
 	friend_energy = 30+levels[active_species]*5
 	rival_energy = 24+index*4
 	turn_count = 0
-	note = "Dostça antrenman başladı. 1 hareket · 2 toparlan · Esc ayrıl"
+	note = "Rakip mevzi aldı. Hamleni seç."
 
 func _spar_again() -> void:
 	if roster.is_empty() or battle >= 0:
@@ -302,30 +365,101 @@ func _spar_again() -> void:
 	if target >= 0:
 		_begin_training(target)
 	else:
-		note = "Antrenman için başka bir yaratığa yaklaş."
+		note = "Karşılaşma için başka bir türe yaklaş."
 
 func _bond(index: int) -> void:
 	if roster.has(index):
 		return
 	roster.append(index)
 	creatures[index].bonded = true
+	creatures[index].hide()
 	active_species = index
 	note = COMPANION.SPECIES[index].name+" ekibine katıldı!"
 	_checkpoint_creatures()
 
-func _battle_action(recover: bool) -> void:
+func _finish_encounter() -> void:
 	if battle < 0:
 		return
+	var ally: Node3D = creatures[active_species]
+	for actor in [ally,creatures[battle]]:
+		actor.engaged = false
+		actor.visible = not actor.bonded
+		actor.label.show()
+	ally.position = ally_origin
+	battle = -1
+	resolving = false
+	visuals.show()
+	camera_pivot.get_node("Camera").current = true
+	battle_camera.queue_free()
+	combat_card.hide()
+
+func _strike(actor: Node3D, defender: Node3D) -> void:
+	var start := actor.position
+	var travel := defender.position - start
+	travel.y = 0.0
+	var motion := actor.create_tween()
+	motion.tween_property(actor,"position",start-travel.normalized()*0.24,0.13)
+	var contact := start+travel.normalized()*maxf(0.1,travel.length()-0.95)
+	if actor.species == 2:
+		motion.tween_property(actor,"position",start+Vector3.UP*0.72,0.19)
+	motion.tween_property(actor,"position",contact,0.18)
+	motion.tween_callback(_impact.bind(actor,defender))
+	motion.tween_property(actor,"position",start,0.23)
+	await motion.finished
+
+func _impact(actor: Node3D, defender: Node3D) -> void:
+	var center := defender.position + Vector3.UP*0.65
+	var direction := (defender.position-actor.position).normalized()
+	var tint: Color = COMPANION.SPECIES[actor.species].accent
+	for i in range(5):
+		var angle := TAU*i/5.0
+		var burst := MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		sphere.radial_segments = 8
+		sphere.rings = 3
+		burst.mesh = sphere
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.albedo_color = tint
+		burst.material_override = mat
+		burst.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(burst)
+		burst.position = center
+		var spread := Vector3(cos(angle),sin(angle),0.1)
+		match actor.species:
+			0:
+				burst.scale = Vector3(0.40,0.065,0.12)
+				burst.rotation.z = angle
+			1:
+				burst.scale = Vector3(0.16,0.24,0.16)
+			2:
+				burst.scale = Vector3(0.20,0.14,0.19)
+		var flash := burst.create_tween()
+		flash.set_parallel(true)
+		flash.tween_property(burst,"position",center+spread*0.85+direction*0.45,0.25)
+		flash.tween_property(burst,"scale",Vector3.ONE*0.015,0.25)
+		flash.chain().tween_callback(burst.queue_free)
+	var recoil := defender.create_tween()
+	var initial: float = defender.visual.rotation.y
+	recoil.tween_property(defender.visual,"rotation:y",initial+0.24,0.06)
+	recoil.tween_property(defender.visual,"rotation:y",initial,0.15)
+
+func _battle_action(guard: bool) -> void:
+	if battle < 0 or resolving:
+		return
+	resolving = true
 	var target := battle
+	var ally: Node3D = creatures[active_species]
+	var rival: Node3D = creatures[target]
 	turn_count += 1
-	if recover:
-		friend_energy = mini(30+levels[active_species]*5,friend_energy+10)
+	var heavy := turn_count % 3 == 0
+	if guard:
+		friend_energy = mini(30+levels[active_species]*5,friend_energy+3)
+		note = "Savunma alındı."
 	else:
+		note = COMPANION.SPECIES[active_species].move
+		await _strike(ally,rival)
 		rival_energy -= int(COMPANION.SPECIES[active_species].power)+levels[active_species]*2
-		var model: Node3D = creatures[target].visual
-		var bounce := model.create_tween()
-		bounce.tween_property(model,"scale:x",0.80,0.10)
-		bounce.tween_property(model,"scale:x",1.0,0.14)
 	if rival_energy <= 0:
 		creatures[target].tired = true
 		experience[active_species] += 12
@@ -335,14 +469,23 @@ func _battle_action(recover: bool) -> void:
 		while levels[active_species]<99 and experience[active_species] >= levels[active_species]*10:
 			experience[active_species] -= levels[active_species]*10
 			levels[active_species] += 1
-		note = "Antrenman tamam! "+COMPANION.SPECIES[active_species].name+" seviye "+str(levels[active_species])+". E ile yeni dostuna yaklaş."
-		battle = -1
+		note = "Karşılaşma kazanıldı. "+COMPANION.SPECIES[active_species].name+" seviye "+str(levels[active_species])+". E ile yeni dostuna yaklaş."
+		_finish_encounter()
 		_checkpoint_creatures()
 		return
-	friend_energy -= 7+target
+	note = "Rakip ağır vuruşa geçti." if heavy else "Rakip karşılık veriyor."
+	await _strike(rival,ally)
+	var incoming := 7+target
+	if heavy:
+		incoming *= 2
+	friend_energy -= 1 if guard else incoming
+	if heavy and guard:
+		rival_energy = maxi(1,rival_energy-5)
+	resolving = false
+	note = "Hamleni seç."
 	if friend_energy <= 0:
-		note = "Yoldaşın yoruldu. Dinlenip yeniden deneyebilirsin."
-		battle = -1
+		note = "Gücün tükendi. Karşılaşmadan çekildin."
+		_finish_encounter()
 
 func _open_path() -> bool:
 	if gate_open or player.position.distance_to(Vector3(0,height_at(0,-33),-33)) > 7:
@@ -364,7 +507,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_ESCAPE:
-				battle = -1
+				if resolving:
+					return
+				_finish_encounter()
 				Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 			KEY_E:
 				if battle < 0:
@@ -425,16 +570,11 @@ func _physics_process(delta: float) -> void:
 	camera.position = Vector3(0,1,camera_distance)
 	if not hit.is_empty():
 		camera.position = camera.position.normalized()*maxf(0.2,camera_pivot.position.distance_to(hit.position)-0.2)
-	for i in roster:
-		if i == battle:
+	for creature in creatures:
+		if creature.engaged or creature.bonded:
 			continue
-		var creature: Node3D = creatures[i]
-		var slot := roster.find(i)
-		var follow := player.position+Basis(Vector3.UP,yaw)*Vector3(1.4+slot*0.9,0,1.9+slot*0.6)
-		creature.position = creature.position.move_toward(follow,delta*4.8)
+		creature.patrol(delta,player.position)
 		creature.position.y = height_at(creature.position.x,creature.position.z)
-		if battle >= 0:
-			creature.look_at(Vector3(creatures[battle].position.x,creature.position.y,creatures[battle].position.z),Vector3.UP,true)
 	if gate_open and player.position.z < -38 and not discovered:
 		discovered = true
 		note = "Çiçekli açıklık keşfedildi. İlk yolculuğun tamamlandı!"
@@ -446,18 +586,27 @@ func _physics_process(delta: float) -> void:
 		_checkpoint_creatures()
 
 func _refresh_interface() -> void:
+	field_card.visible = battle < 0
 	var goal := "Filizik ile dost ol · E ile meyve sun"
 	if roster.has(0):
-		goal = "Filizik'i antrenmanla seviye 2 yap" if levels[0]<2 else "Sarmaşık kapıya git · F ile Filizik'e yardım et"
+		goal = "Filizik ile bir saha karşılaşması kazan" if levels[0]<2 else "Sarmaşık kapıya git · F ile Filizik'e yardım et"
 	if discovered:
 		goal = "Çiçekli açıklık keşfedildi!"
 	journal.text = "FİLİZYA · YOLDAŞLAR VADİSİ\n"+goal
 	var team := "Ekibin henüz boş"
 	if not roster.is_empty():
 		team = "Yoldaş · "+COMPANION.SPECIES[active_species].name+"  Sv."+str(levels[active_species])+"  Deneyim "+str(experience[active_species])+"/"+str(levels[active_species]*10)
-	panel.text = team+"\nMeyve "+str(berries)+"  ·  FPS "+str(Engine.get_frames_per_second())+"\nWASD hareket · Shift koş · Space zıpla · Tab yoldaş · E tanış · R antrenman · F yardım\n"+note
+	panel.text = team+"\nMeyve "+str(berries)+"  ·  FPS "+str(Engine.get_frames_per_second())+"\nWASD hareket · Shift koş · Space zıpla · Tab yoldaş · E tanış · R karşılaşma · F yardım\n"+note
 	if battle >= 0:
-		prompt.text = "ANTRENMAN · "+COMPANION.SPECIES[battle].name+"\nYoldaş enerjisi "+str(friend_energy)+"  ·  Rakip "+str(rival_energy)+"\n[1] "+COMPANION.SPECIES[active_species].move+"   [2] Toparlan   [Esc] Ayrıl"
+		prompt.text = ""
+		combat_card.show()
+		ally_meter.max_value = 30+levels[active_species]*5
+		ally_meter.value = friend_energy
+		foe_meter.max_value = 24+battle*4
+		foe_meter.value = maxi(0,rival_energy)
+		var shown_turn := turn_count if resolving else turn_count+1
+		var threat := "AĞIR VURUŞ" if shown_turn%3 == 0 else "Saldırı"
+		combat_text.text = "%s  %d   /   %s  %d\nRakibin niyeti · %s\n[1] %s     [2] Savun     [Esc] Çekil" % [COMPANION.SPECIES[active_species].name,friend_energy,COMPANION.SPECIES[battle].name,maxi(0,rival_energy),threat,COMPANION.SPECIES[active_species].move]
 	else:
 		prompt.text = "[E] "+COMPANION.SPECIES[_nearest_creature()].name+" ile tanış" if _nearest_creature()>=0 else ""
 
@@ -526,6 +675,7 @@ func _load_progress() -> void:
 		if (data.roster.has(float(i)) or data.roster.has(i)) and not roster.has(i):
 			roster.append(i)
 			creatures[i].bonded = true
+			creatures[i].hide()
 	active_species = int(data.active) if roster.has(int(data.active)) else (roster[0] if not roster.is_empty() else 0)
 	gate_open = data.gate
 	discovered = data.discovered
