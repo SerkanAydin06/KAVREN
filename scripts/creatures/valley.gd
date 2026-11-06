@@ -414,7 +414,7 @@ func _impact(actor: Node3D, defender: Node3D) -> void:
 		flash.tween_property(burst,"scale",Vector3.ONE*0.015,0.25)
 		flash.chain().tween_callback(burst.queue_free)
 	var recoil := defender.create_tween()
-	var initial := defender.visual.rotation.y
+	var initial: float = defender.visual.rotation.y
 	recoil.tween_property(defender.visual,"rotation:y",initial+0.24,0.06)
 	recoil.tween_property(defender.visual,"rotation:y",initial,0.15)
 
