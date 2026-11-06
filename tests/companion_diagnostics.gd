@@ -12,12 +12,14 @@ func _run() -> void:
 	game.player.position = game.creatures[0].position
 	game._interact()
 	game._interact()
-	if game.roster != [0] or game.berries!=1:
+	if game.roster != [0] or game.berries!=1 or game.creatures[0].visible:
 		failures += 1
 	game.player.position = game.creatures[1].position
 	game._interact()
+	if not game.battle_camera.current or not game.creatures[0].visible:
+		failures += 1
 	for turn in range(6):
-		game._battle_action(false)
+		await game._battle_action(false)
 	if game.battle!=-1 or game.levels[0]!=2 or not game.creatures[1].tired:
 		failures += 1
 	game._interact()
@@ -30,7 +32,7 @@ func _run() -> void:
 	# A recruited partner can still train; switching partners cannot consume all encounters.
 	game._begin_training(1)
 	for turn in range(6):
-		game._battle_action(false)
+		await game._battle_action(false)
 	if game.battle!=-1 or game.experience[game.active_species]<=0:
 		failures += 1
 	game._checkpoint_creatures()

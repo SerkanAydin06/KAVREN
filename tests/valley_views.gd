@@ -31,8 +31,7 @@ func _capture() -> void:
 	scene.player.position = scene.creatures[1].position+Vector3(0,0,1.5)
 	scene._interact()
 	scene._refresh_interface()
-	camera.position = scene.creatures[1].position+Vector3(2,2.4,5)
-	camera.look_at(scene.creatures[1].position+Vector3.UP)
+	scene.battle_camera.current = true
 	for i in range(12):
 		await RenderingServer.frame_post_draw
 	if root.get_texture().get_image().save_png(folder+"/training.png")!=OK:

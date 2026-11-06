@@ -11,17 +11,28 @@ var tired := false
 var trust := 0
 var visual: Node3D
 var phase := 0.0
+var den := Vector3.ZERO
+var destination := Vector3.ZERO
+var rest_time := 0.0
+var patrol_step := 0
+var walking := false
+var engaged := false
+var feet: Array[MeshInstance3D] = []
+var ears: Array[MeshInstance3D] = []
 var label: Label3D
 var shared_materials := {}
 
 func _ready() -> void:
+	den = position
+	destination = den
+	phase = species * 1.73
 	visual = Node3D.new()
 	add_child(visual)
 	var info: Dictionary = SPECIES[species]
 	_blob(Vector3(0,0.44,0), Vector3(0.48,0.43,0.39), info.color)
 	_blob(Vector3(0,0.91,0.045), Vector3(0.48,0.38,0.37), info.color)
 	for sign_value in [-1.0,1.0]:
-		_blob(Vector3(sign_value*0.29,0.12,0.08),Vector3(0.20,0.12,0.26),info.accent)
+		feet.append(_blob(Vector3(sign_value*0.29,0.12,0.08),Vector3(0.20,0.12,0.26),info.accent))
 		_blob(Vector3(sign_value*0.44,0.49,0.08),Vector3(0.12,0.20,0.14),info.accent)
 		_blob(Vector3(sign_value*0.20,1.02,0.37),Vector3(0.095,0.128,0.036),Color("#213c52"))
 		_blob(Vector3(sign_value*0.20-0.018,1.065,0.406),Vector3(0.029,0.036,0.014),Color.WHITE)
@@ -34,6 +45,7 @@ func _ready() -> void:
 		else:
 			ear = _blob(Vector3(sign_value*0.28,1.34,0),Vector3(0.18,0.24,0.16),info.accent)
 		ear.rotation.z = sign_value * -0.48
+		ears.append(ear)
 	_blob(Vector3(0,0.86,0.405),Vector3(0.06,0.025,0.022),Color("#4c4b5f"))
 	if species == 0:
 		for i in range(2):
@@ -73,9 +85,43 @@ func _blob(center: Vector3, shape_scale: Vector3, color: Color) -> MeshInstance3
 	visual.add_child(part)
 	return part
 
+func patrol(delta: float, observer: Vector3) -> void:
+	walking = false
+	if bonded or tired or engaged:
+		return
+	if position.distance_to(observer) < 3.0:
+		var bearing := observer - position
+		if bearing.length_squared() > 0.02:
+			rotation.y = lerp_angle(rotation.y, atan2(bearing.x,bearing.z), minf(delta*5,1))
+		return
+	if rest_time > 0:
+		rest_time -= delta
+		return
+	var step := destination - position
+	step.y = 0
+	if step.length() < 0.12:
+		patrol_step += 1
+		var bearing := patrol_step * 2.40 + species
+		destination = den + Vector3(cos(bearing)*2.7,0,sin(bearing)*1.7)
+		rest_time = 0.8 + species * 0.4
+	else:
+		walking = true
+		var direction := step.normalized()
+		position += direction * minf(step.length(),delta*(1.25-0.2*species))
+		rotation.y = lerp_angle(rotation.y,atan2(direction.x,direction.z),minf(delta*5,1))
+
 func _process(delta: float) -> void:
 	phase += delta
-	visual.position.y = absf(sin(phase*2.7))*0.045 if not tired else 0.0
-	visual.rotation.z = sin(phase*1.2)*0.035
-	visual.scale.y = 0.79 if tired else 1.0
-	label.text = SPECIES[species].name + (" · Yoldaş" if bonded else (" · Dinleniyor" if tired else ""))
+	var stride := sin(phase*(8.5-species))
+	var lift := 0.03
+	if walking:
+		lift = [0.22,0.08,0.045][species]
+	visual.position.y = absf(stride)*lift
+	visual.rotation.z = stride*(0.09 if walking else 0.022)
+	visual.rotation.x = -0.14 if engaged else 0.0
+	visual.scale.y = 0.84 if tired and not engaged else 1.0
+	for i in range(feet.size()):
+		var side := -1.0 if i == 0 else 1.0
+		feet[i].rotation.x = stride*side*(0.65 if walking else 0.05)
+		ears[i].rotation.z = side*(0.48 + 0.12*stride if walking else 0.48 + 0.035*sin(phase*2))
+	label.text = SPECIES[species].name
